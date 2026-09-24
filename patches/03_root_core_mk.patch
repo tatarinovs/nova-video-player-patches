@@ -1,0 +1,111 @@
+diff --git a/core.mk b/core.mk
+index 0c1fe22..e3f0eb8 100644
+--- a/core.mk
++++ b/core.mk
+@@ -10,7 +10,12 @@ phony_rules := all full extractdb install logs clearlogs screenshot layout dumpl
+ native_rules :=
+ native_clean_rules :=
+ 
++ifeq ($(OS),Windows_NT)
++os := windows
++export SHELL := sh
++else
+ os := $(shell echo $(shell uname -s) | tr '[:upper:]' '[:lower:]')
++endif
+ 
+ ifeq ($(os), darwin)
+ 	readlink_prefix := g
+@@ -47,6 +52,7 @@ endif
+ ifneq (,$(ANDROID_SDK_ROOT))
+ android_sdk := $(ANDROID_SDK_ROOT)
+ endif
++android_sdk := $(subst \,/,$(android_sdk))
+ 
+ $(info android_sdk is $(android_sdk))
+ 
+@@ -61,15 +67,25 @@ ifeq ($(WHICHSDKMANAGER), $(android_sdk)/cmdline-tools/latest/bin/sdkmanager)
+   SDKMANAGER := yes | JAVA_HOME=$(JAVA11) $(android_sdk)/cmdline-tools/latest/bin/sdkmanager
+ endif
+ 
+-ifneq ($(wildcard $(android_sdk)/ndk/.*),)
+-android_ndk := $(shell ls -d $(android_sdk)/ndk/* | sort -V | tail -n 1)
++ifneq ($(wildcard $(android_sdk)/ndk/*),)
++android_ndk := $(lastword $(sort $(wildcard $(android_sdk)/ndk/*)))
+ endif
++android_ndk := $(subst \,/,$(android_ndk))
+ $(info android_ndk is $(android_ndk))
+ 
++ifeq ($(OS),Windows_NT)
++ndk_build_cmd := $(android_ndk)/ndk-build.cmd
++else ifneq ($(wildcard $(android_ndk)/build/ndk-build),)
++ndk_build_cmd := $(android_ndk)/build/ndk-build
++else
++ndk_build_cmd := $(android_ndk)/ndk-build
++endif
++
+ # cmake path detection (latest installed cmake)
+-ifneq ($(wildcard $(android_sdk)/cmake/.*),)
+-android_cmake := $(shell ls -d $(android_sdk)/cmake/* | sort -V | tail -n 1)
++ifneq ($(wildcard $(android_sdk)/cmake/*),)
++android_cmake := $(lastword $(sort $(wildcard $(android_sdk)/cmake/*)))
+ endif
++android_cmake := $(subst \,/,$(android_cmake))
+ $(info android_cmake is $(android_cmake))
+ 
+ # NDK prebuilt and LLVM toolchain paths
+@@ -188,24 +204,24 @@ endif
+ $(1)/obj/clean: $(NATIVE_CLEAN_DEPS_$(1))
+ 	@if [ -d "$(1)/obj" ]; then \
+ 		echo "mk changed; force clean"; \
+-		make native_clean_$(1); \
++		$(MAKE) native_clean_$(1); \
+ 	fi;
+ 
+ native_build_$(1): $(1)/obj/clean
+ 	@if [ -n "$(prev_build_type)" -a "$(prev_build_type)" != "$(build_type)" ];then \
+ 		echo "BUILD type changed; force clean"; \
+-		make native_clean_$(1); \
++		$(MAKE) native_clean_$(1); \
+ 	fi;
+ 	@if [ -d $(1) ];then \
+ 		mkdir -p $(1)/obj; \
+ 		echo $(build_type) > $(1)/obj/build_type; \
+ 		touch $(1)/obj/clean; \
+-		REPO_TOP_DIR=$(REPO_TOP_DIR) BUILD=$(BUILD) NDK_APP_ABI="$(NDK_APP_ABI)" ASAN="$(asan)" android_ndk=$(android_ndk) $(android_ndk)/ndk-build $(ndk_debug) $(ndk_v) $(ndk_jobs) -C $(1); \
++		REPO_TOP_DIR=$(REPO_TOP_DIR) BUILD=$(BUILD) NDK_APP_ABI="$(NDK_APP_ABI)" ASAN="$(asan)" android_ndk=$(android_ndk) $(ndk_build_cmd) $(ndk_debug) $(ndk_v) $(ndk_jobs) -C $(1); \
+ 	fi;
+ 
+ native_clean_$(1):
+ 	@if [ -d $(1) ];then \
+-		$(android_ndk)/ndk-build -C $(1) clean; \
++		$(ndk_build_cmd) -C $(1) clean; \
+ 		rm -rf $(1)/obj; \
+ 		rm -rf $(1)/libs/*/*; \
+ 	fi;
+@@ -374,7 +390,7 @@ define cp_ffmpeg_libs
+ endef
+ 
+ define make_avos
+-	MAKE_JOBS=$(MAKE_JOBS) BUILD=$(BUILD) $(ndk_debug) NDK_APP_ABI="$(NDK_APP_ABI)" LIBAV_CONFIG=$(2) make native_build_native/avos
++	$(MAKE) MAKE_JOBS=$(MAKE_JOBS) BUILD=$(BUILD) $(ndk_debug) NDK_APP_ABI="$(NDK_APP_ABI)" LIBAV_CONFIG=$(2) native_build_native/avos
+ 
+ 	@if [ "$(NDK_CPU_ARM_NEON)" = "1" ];then \
+ 		mkdir -p $(1)/libs/armeabi-v7a; \
+@@ -438,7 +454,7 @@ native_avos_base: $(FFMPEG_PREBUILT_DIR)/dist-full-arm64-v8a/lib/libavcodec.so
+ 	$(call cp_ffmpeg_libs,MediaLib,base)
+ 	$(call make_avos,MediaLib,base)
+ 
+-native_avos_full: native_build_native/ffmpeg-android-builder
++native_avos_full: $(FFMPEG_PREBUILT_DIR)/dist-full-arm64-v8a/lib/libavcodec.so
+ 	$(call cp_ffmpeg_libs,MediaLib,full)
+ 	$(call make_avos,MediaLib,full)
+ 
+@@ -462,7 +478,7 @@ native_build_native/torrentd: native_build_native/boost native_build_native/libt
+ 		echo "torrentd already built, skipping"; \
+ 	else \
+ 		mkdir -p $(TORRENTD_PREBUILT_DIR)/libs; \
+-		REPO_TOP_DIR=$(REPO_TOP_DIR) BUILD=$(BUILD) NDK_APP_ABI="$(NDK_APP_ABI)" ASAN="$(asan)" android_ndk=$(android_ndk) $(android_ndk)/ndk-build $(ndk_debug) $(ndk_v) $(ndk_jobs) -C native/torrentd NDK_LIBS_OUT=$(REPO_TOP_DIR)/$(TORRENTD_PREBUILT_DIR)/libs; \
++		REPO_TOP_DIR=$(REPO_TOP_DIR) BUILD=$(BUILD) NDK_APP_ABI="$(NDK_APP_ABI)" ASAN="$(asan)" android_ndk=$(android_ndk) $(ndk_build_cmd) $(ndk_debug) $(ndk_v) $(ndk_jobs) -C native/torrentd NDK_LIBS_OUT=$(REPO_TOP_DIR)/$(TORRENTD_PREBUILT_DIR)/libs; \
+ 	fi
+ 
+ native_clean_native/torrentd:
