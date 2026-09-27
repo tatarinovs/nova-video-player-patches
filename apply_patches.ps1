@@ -1,38 +1,40 @@
-# Script to apply custom patches to aos-AVP (MediaLib, Video, core.mk)
-$ErrorActionPreference = "Stop"
+# Applies the custom patches (patches/*.patch) to aos-AVP and its submodules.
+# Idempotent: a patch which is already applied is skipped. Each patch is checked before being
+# applied, so a failure never leaves a half-patched repository behind.
+# "Continue": with "Stop", Windows PowerShell 5.1 turns git's stderr output into exceptions;
+# failures are detected through $LASTEXITCODE instead.
+$ErrorActionPreference = "Continue"
+Set-Location $PSScriptRoot
 
-Write-Host "Applying patches to MediaLib..." -ForegroundColor Cyan
-git -C MediaLib apply --3way ../patches/01_medialib.patch
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Failed to apply 01_medialib.patch." -ForegroundColor Red
-    exit 1
+$failed = $false
+
+function Apply-Patch([string]$Repo, [string]$Patch) {
+    $path = Join-Path $PSScriptRoot $Patch
+    git -C $Repo apply --check --reverse $path 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "= ${Patch}: already applied" -ForegroundColor DarkGray
+        return
+    }
+    git -C $Repo apply --check $path 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        git -C $Repo apply $path
+        Write-Host "+ ${Patch}: applied" -ForegroundColor Green
+        return
+    }
+    git -C $Repo apply --3way $path
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "~ ${Patch}: applied with 3-way merge, check the result" -ForegroundColor Yellow
+        return
+    }
+    Write-Host "! ${Patch}: FAILED (resolve conflicts in $Repo, then run patches/export_patches.sh)" -ForegroundColor Red
+    $script:failed = $true
 }
 
-Write-Host "Applying patches to Video..." -ForegroundColor Cyan
-git -C Video apply --3way ../patches/02_video.patch
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Failed to apply 02_video.patch." -ForegroundColor Red
-    exit 1
-}
+Apply-Patch "MediaLib"        "patches/01_medialib.patch"
+Apply-Patch "Video"           "patches/02_video.patch"
+Apply-Patch "."               "patches/03_root_core_mk.patch"
+Apply-Patch "FileCoreLibrary" "patches/04_filecorelibrary.patch"
+Apply-Patch "native/avos"     "patches/05_native_avos.patch"
 
-Write-Host "Applying root core.mk patch..." -ForegroundColor Cyan
-git apply --3way patches/03_root_core_mk.patch
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Notice: 03_root_core_mk.patch not applied (may already be up-to-date)." -ForegroundColor Yellow
-}
-Write-Host "Applying patches to FileCoreLibrary..." -ForegroundColor Cyan
-git -C FileCoreLibrary apply --3way ../patches/04_filecorelibrary.patch
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Failed to apply 04_filecorelibrary.patch." -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "Applying patches to native/avos..." -ForegroundColor Cyan
-git -C native/avos apply --3way ../../patches/05_native_avos.patch
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Failed to apply 05_native_avos.patch." -ForegroundColor Red
-    exit 1
-}
-
+if ($failed) { exit 1 }
 Write-Host "All custom patches applied successfully!" -ForegroundColor Green
-
