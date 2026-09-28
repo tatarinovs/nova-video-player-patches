@@ -127,7 +127,7 @@ index ba89ce31..f3f30ea7 100644
              <intent-filter>
                  <action android:name="archos.intent.action.RESUME_VIDEOPLAYER" />
 diff --git a/build.gradle b/build.gradle
-index d59dbe48..07899774 100644
+index bd5f1b77..00091f17 100644
 --- a/build.gradle
 +++ b/build.gradle
 @@ -137,6 +137,10 @@ android {
@@ -302,13 +302,32 @@ index 9e8d5020..ba3abd0f 100644
 +    </FrameLayout>
  </RelativeLayout>
 diff --git a/res/values-ru/strings.xml b/res/values-ru/strings.xml
-index 7e057df6..b2d97ceb 100644
+index 2f752ef3..30fc9689 100644
 --- a/res/values-ru/strings.xml
 +++ b/res/values-ru/strings.xml
-@@ -865,4 +865,25 @@
+@@ -467,12 +467,12 @@
+     <string name="preferences_stream_max_iframe_size_summary">Максимальный размер сжатого i-кадра в Мб</string>
+     <string name="preferences_force_passthrough">Принудительная сквозная передача звука</string>
+     <string name="preferences_force_passthrough_summary">Если включена, переопределяет настройки AV ресивера для текущего аудиокодека</string>
+-    <string name="preferences_audio_speed_mode_title">Скорость аудио</string>
+-    <string name="preferences_audio_speed_mode_summary">Выбор фильтра скорости звука, используемого для изменения скорости воспроизведения. ⚠️ Экспериментально, может привести к разрывам и искажениям в видео и аудио</string>
++    <string name="preferences_audio_speed_mode_title">Алгоритм скорости звука</string>
++    <string name="preferences_audio_speed_mode_summary">Выбор аудиофильтра для изменения скорости воспроизведения. ⚠ Экспериментальная функция: возможны рывки видео или искажения звука</string>
+     <string name="audio_speed_mode_disabled">Отключено</string>
+-    <string name="audio_speed_mode_audiotrack">Родной системы (AudioTrack)</string>
+-    <string name="audio_speed_mode_atempo">Сбалансированный (Fmpeg atempo)</string>
+-    <string name="audio_speed_mode_sonic">Голос и речь (Sonic)</string>
++    <string name="audio_speed_mode_audiotrack">Системный (AudioTrack)</string>
++    <string name="audio_speed_mode_atempo">Сбалансированный (FFmpeg atempo)</string>
++    <string name="audio_speed_mode_sonic">Для речи и голоса (Sonic)</string>
+     <string name="preferences_enable_dynamic_audio_delay_title">Динамическая оценка задержки звука/видео</string>
+     <string name="preferences_enable_dynamic_audio_delay_summary">Использовать динамическую оценку задержки для лучшей синхронизации звука и видео, особенно с гарнитурой Bluetooth. Отключите, если возникают проблемы с синхронизацией.</string>
+     <string name="preferences_enable_spatialization_title">Платформенный преобразователь</string>
+@@ -871,9 +871,143 @@
      <string name="enable_sponsor_summary">Перейти по ссылке для пожертвований: важна любая помощь проекту.</string>
      <string name="upgrade_info">Информация об обновлении</string>
      <string name="v5_v6_upgrade_info">ВНИМАНИЕ: Это обновление Nova потребует пересканировать всю библиотеку мультимедиа. Чтобы избежать проблем, настоятельно рекомендуется полностью переустановить программу. Пожалуйста, ознакомьтесь с FAQ для подробностей.</string>
+-    <string name="ui_choice_title">Кажется, вы используете Nova Video Player на телевизоре.\nЕсли это так, мы рекомендуем использовать наш новый ТВ-интерфейс</string>
 +    <string name="preferences_seek_step_title">Шаг перемотки</string>
 +    <string name="preferences_seek_step_summary">Интервал перемотки кнопками влево/вправо</string>
 +    <string name="seek_step_2s">2 секунды</string>
@@ -330,6 +349,126 @@ index 7e057df6..b2d97ceb 100644
 +    <string name="screensaver_timeout_10min">10 минут</string>
 +    <string name="screensaver_timeout_15min">15 минут</string>
 +    <string name="screensaver_timeout_30min">30 минут</string>
++
++    <!-- Интерфейс ТВ и медиатека -->
++    <string name="non_scraped_videos_format">Нераспознанные видео  -  %d</string>
++    <string name="always_leanback_on_tv">Всегда запускать ТВ-интерфейс</string>
++    <string name="always_leanback_on_tv_summary">Всегда запускать приложение в интерфейсе Android TV. Отключите, если предпочитаете классический интерфейс на ТВ.</string>
++    <string name="ui_choice_title">Похоже, вы используете Nova Video Player на телевизоре.\nВ этом случае мы рекомендуем использовать оптимизированный ТВ-интерфейс</string>
+     <string name="ui_choice_tv">ТВ-интерфейс</string>
+-    <string name="ui_choice_tablet">Планшетный интерфейс</string>
+-    <string name="ui_choice_help">Вы можете изменить свой выбор в настройках приложения позже</string>
++    <string name="ui_choice_tablet">Классический интерфейс</string>
++    <string name="ui_choice_help">Вы сможете изменить этот выбор позже в настройках приложения</string>
+     <string name="workgroup">Рабочая группа</string>
++
++    <!-- Дополнительные настройки ТВ-интерфейса -->
++    <string name="preferences_more_leanback_title">Дополнительные настройки ТВ-интерфейса</string>
++    <string name="preferences_make_time_negative_title">Отрицательное оставшееся время в плеере</string>
++    <string name="preferences_hide_trailer_row_title">Скрыть строку трейлеров у фильмов</string>
++    <string name="preferences_show_by_rating_title">Показывать фильмы и сериалы по рейтингу</string>
++
++    <!-- Настройки аудиодекодера и дорожек -->
++    <string name="prefer_original_audio_track_title">Предпочитать оригинальную дорожку</string>
++    <string name="prefer_original_audio_track_summary">Использовать звуковую дорожку на языке оригинала фильма или сериала, если доступно</string>
++    <string name="audio_decoder_prefer_ffmpeg">Предпочитать FFmpeg (по умолчанию)</string>
++    <string name="audio_decoder_prefer_mediacodec">Предпочитать MediaCodec (экспериментально)</string>
++
++    <!-- Настройки субтитров -->
++    <string name="subtitle_background_text">Фон субтитров</string>
++    <string name="subtitle_bg_opacity_text">Прозрачность фона</string>
++    <string name="subtitles_hide_default_summary">Скрывать обычные субтитры по умолчанию; подходящие форсированные субтитры будут показываться</string>
++
++    <!-- Сортировка названий -->
++    <string name="preferences_sort_ignore_articles_title">Игнорировать начальные артикли при сортировке</string>
++    <string name="preferences_sort_ignore_articles_summary">Игнорировать начальные артикли (\"The\", \"A\", \"Le\", \"Das\" и др.) при сортировке по алфавиту</string>
++    <string name="recreate_sort_titles_title">Пересоздать названия для сортировки</string>
++    <string name="recreate_sort_titles_summary">Пересчитать названия для сортировки фильмов, сериалов и коллекций</string>
++    <string name="recreate_sort_titles_in_progress">Выполняется пересоздание названий для сортировки…</string>
++    <string name="recreate_sort_titles_done">Названия для сортировки пересозданы</string>
++
++    <!-- Пропуск заставок и титров (IntroDB) -->
++    <string name="pref_introdb_autoskip_title">Пропуск заставок и титров</string>
++    <string name="introdb_autoskip">Автопропуск</string>
++    <string name="introdb_segment_intro">Заставка</string>
++    <string name="introdb_segment_recap">Ранее в серии</string>
++    <string name="introdb_segment_outro">Концовка</string>
++    <string name="introdb_segment_credits">Титры</string>
++    <string name="introdb_segment_preview">В следующей серии</string>
++    <string name="introdb_segment_end">конец</string>
++
++    <!-- Статусы OpenSubtitles -->
++    <string name="opensubtitles_summary_anonymous">Анонимный доступ</string>
++    <string name="opensubtitles_summary_user_account">Учётная запись</string>
++    <string name="opensubtitles_summary_not_checked">Ещё не проверено</string>
++    <string name="opensubtitles_summary_credentials_verified">Учётные данные подтверждены</string>
++    <string name="opensubtitles_summary_login_failed">Ошибка входа</string>
++    <string name="opensubtitles_summary_service_unavailable">Сервис недоступен</string>
++    <string name="opensubtitles_summary_quota_exhausted">Лимит запросов исчерпан</string>
++    <string name="opensubtitles_summary_status">%1$s · %2$s</string>
++
++    <!-- Trakt: авторизация и синхронизация -->
++    <string name="connect_trakt">Подключить Trakt</string>
++    <string name="trakt_device_auth_step1">1. На телефоне или компьютере перейдите по адресу:</string>
++    <string name="trakt_device_auth_step2">2. Введите этот код:</string>
++    <string name="trakt_device_auth_waiting">Ожидание авторизации…</string>
++    <string name="trakt_device_auth_success">Подключение выполнено успешно!</string>
++    <string name="trakt_device_auth_error">Ошибка авторизации. Пожалуйста, попробуйте снова.</string>
++    <string name="trakt_device_auth_invalid_code">Не удалось получить код устройства от Trakt. Пожалуйста, попробуйте снова.</string>
++    <string name="trakt_device_auth_timeout">Срок действия кода истёк. Пожалуйста, попробуйте снова.</string>
++    <string name="trakt_account_locked">Учётная запись Trakt заблокирована. Разблокируйте на trakt.tv или попробуйте позже.</string>
++    <string name="trakt_social_signin_unsupported">Вход через Google/Facebook/Apple здесь не поддерживается. Пожалуйста, используйте имя пользователя и пароль Trakt.</string>
++    <string name="trakt_sync_status_never">Ещё не синхронизировалось</string>
++    <string name="trakt_sync_status_ok">Синхронизировано: %1$s назад</string>
++    <string name="trakt_sync_status_ok_skipped">Синхронизировано: %1$s назад · %2$d видео ожидает (длительность неизвестна)</string>
++    <string name="trakt_sync_status_ok_meta_skipped">Синхронизировано: %1$s назад · пропущено скробблов: %2$d (нет метаданных)</string>
++    <string name="trakt_sync_status_ok_both_skipped">Синхронизировано: %1$s назад · ожидает: %2$d (длительность неизвестна), пропущено: %3$d (нет метаданных)</string>
++    <string name="trakt_sync_status_error_network">Ошибка последней синхронизации: ошибка сети</string>
++    <string name="trakt_sync_status_error_auth">Ошибка авторизации — пожалуйста, выполните вход снова</string>
++    <string name="trakt_sync_status_error_locked">Учётная запись заблокирована — разблокируйте на trakt.tv</string>
++    <string name="trakt_signin_summary_logged_sync">Выполнен вход · %1$s</string>
++
++    <!-- Резервное копирование и восстановление медиатеки -->
++    <string name="media_library_export_title">Резервное копирование медиатеки</string>
++    <string name="media_library_export_summary">Экспорт базы media.db, учётных данных (SMB/FTP/SFTP), закладок и кэшированных постеров в zip-архив</string>
++    <string name="media_library_import_title">Восстановление медиатеки</string>
++    <string name="media_library_import_summary">Импорт базы media.db, учётных данных, закладок и кэшированных постеров из ранее созданного zip-архива</string>
++    <string name="media_library_export_in_progress">Экспорт медиатеки, учётных данных и закладок…</string>
++    <string name="media_library_import_in_progress">Импорт медиатеки, учётных данных и закладок…</string>
++    <string name="media_library_export_success">Медиатека, учётные данные и закладки успешно экспортированы в:\n%s</string>
++    <string name="media_library_import_success">Медиатека, учётные данные и закладки успешно импортированы. Перезапуск приложения…</string>
++    <string name="media_library_import_error">Ошибка импорта медиатеки</string>
++    <string name="media_library_export_error">Ошибка экспорта медиатеки</string>
++    <string name="media_library_export_dir_not_found">Папка для экспорта не найдена</string>
++    <string name="media_library_no_backup_found">Файл резервной копии не найден. Сначала выполните экспорт.</string>
++    <string name="media_library_backup_info">Найден файл резервной копии: backup.zip\nРазмер: %d МБ\n\n⚠️ Содержит: метаданные, учётные данные, закладки, изображения\n\nПродолжить импорт?</string>
++    <string name="media_library_import_dialog_title">Восстановление медиатеки</string>
++    <string name="media_library_import_confirm_title">⚠️ ПОДТВЕРДИТЕ ПОЛНУЮ ЗАМЕНУ</string>
++    <string name="media_library_import_warning">⚠️ ВНИМАНИЕ: ПОЛНАЯ ЗАМЕНА ⚠️\n\nЭто действие ПОЛНОСТЬЮ УДАЛИТ текущую медиатеку и заменит её данными из резервной копии.\n\nВСЕ текущие данные будут БЕЗВОЗВРАТНО УТЕРЯНЫ:\n• Все метаданные фильмов и сериалов\n• Все кэшированные постеры и фоны\n• Весь прогресс и история просмотров\n• Все учётные данные сети (SMB/FTP/SFTP/WebDAV)\n• Все сетевые закладки\n• Все ручные правки и настройки\n\nЭто действие НЕЛЬЗЯ отменить!\n\nПриложение автоматически перезапустится после импорта.\n\nВы абсолютно уверены, что хотите продолжить?</string>
++    <string name="media_library_import_button_confirm">ДА, УДАЛИТЬ И ЗАМЕНИТЬ</string>
++
++    <!-- Возможности экрана, звука и внешний плеер -->
++    <string name="not_available_during_media_scanning">Недоступно во время сканирования медиафайлов.</string>
++    <string name="hdr_capability">Поддерживаемые экраном форматы HDR:</string>
++    <string name="hdmi_audio_capabilities">Возможности аудиоресивера HDMI:</string>
++    <string name="spdif_audio_capabilities">Возможности аудиовыхода S/PDIF:</string>
++    <string name="max_audio_channels">Максимум аудиоканалов:</string>
++    <string name="supported_refresh_rates">Поддерживаемая частота обновления экрана:</string>
++    <string name="external_player_service_title">Воспроизведение во внешнем плеере</string>
++    <string name="external_player_service_description">Nova Video Player передаёт контент для внешнего плеера</string>
++    <string name="stop">Остановить</string>
++
++    <!-- Дескрипторы дорожек звука и субтитров -->
++    <string name="s_visual_impaired">для слабовидящих</string>
++    <string name="s_audio_description">тифлокомментарии</string>
++    <string name="s_descriptions">описания</string>
++    <string name="s_forced">форсированные</string>
++    <string name="s_original">оригинал</string>
++    <string name="s_translated">перевод</string>
++    <string name="s_dubbed">дубляж</string>
++    <string name="s_commentary">комментарии</string>
++    <string name="s_lyrics">текст песни</string>
++    <string name="s_karaoke">караоке</string>
  </resources>
 diff --git a/res/values/arrays.xml b/res/values/arrays.xml
 index e3f0e5f4..c24b1aa8 100644
@@ -390,7 +529,7 @@ index e3f0e5f4..c24b1aa8 100644
 +    </string-array>
  </resources>
 diff --git a/res/values/strings.xml b/res/values/strings.xml
-index 4ef2df73..e6c145f4 100644
+index 4ef2df73..38d8abb7 100644
 --- a/res/values/strings.xml
 +++ b/res/values/strings.xml
 @@ -1051,6 +1051,27 @@
@@ -421,6 +560,45 @@ index 4ef2df73..e6c145f4 100644
  
      <string name="ui_choice_title">It seems that you are using Nova Video Player on a TV.\nIf it is actually the case, we recommend using our new TV user interface</string>
      <string name="ui_choice_tv">TV interface</string>
+@@ -1058,4 +1079,9 @@
+     <string name="ui_choice_help">You can change your choice in the application settings later</string>
+     <string name="workgroup">Workgroup</string>
+ 
++    <string name="preferences_more_leanback_title">More TV User Interface</string>
++    <string name="preferences_make_time_negative_title">Make remaining time negative in player</string>
++    <string name="preferences_hide_trailer_row_title">Hide trailer row in movies</string>
++    <string name="preferences_show_by_rating_title">Show movies/tv shows by rating</string>
+ </resources>
++
+diff --git a/res/xml/preferences_more_leanback.xml b/res/xml/preferences_more_leanback.xml
+index a3bace0a..59465676 100644
+--- a/res/xml/preferences_more_leanback.xml
++++ b/res/xml/preferences_more_leanback.xml
+@@ -1,19 +1,20 @@
+ <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:app="http://schemas.android.com/apk/res-auto"
+-    android:title="More TV User Interface">
++    android:title="@string/preferences_more_leanback_title">
+ 
+     <CheckBoxPreference
+             android:defaultValue="false"
+             android:key="make_time_negative"
+-            android:title="Make remaining time negative in player"/>
++            android:title="@string/preferences_make_time_negative_title"/>
+ 
+     <CheckBoxPreference
+             android:defaultValue="false"
+             android:key="hide_trailer_row"
+-            android:title="Hide trailer row in movies"/>
++            android:title="@string/preferences_hide_trailer_row_title"/>
+ 
+     <CheckBoxPreference
+             android:defaultValue="false"
+             android:key="show_by_rating"
+-            android:title="Show movies/tv shows by rating"/>
++            android:title="@string/preferences_show_by_rating_title"/>
+ </PreferenceScreen>
++
 diff --git a/res/xml/preferences_video.xml b/res/xml/preferences_video.xml
 index a602e0fb..cf747ec5 100644
 --- a/res/xml/preferences_video.xml
@@ -988,10 +1166,10 @@ index 00000000..15c79b36
 +    }
 +}
 diff --git a/src/main/java/com/archos/mediacenter/video/player/Player.java b/src/main/java/com/archos/mediacenter/video/player/Player.java
-index 77fa0932..bf57b216 100644
+index 70cbca45..66cdd76e 100644
 --- a/src/main/java/com/archos/mediacenter/video/player/Player.java
 +++ b/src/main/java/com/archos/mediacenter/video/player/Player.java
-@@ -1274,6 +1274,9 @@ public class Player implements IPlayerControl,
+@@ -1289,6 +1289,9 @@ public class Player implements IPlayerControl,
          mSurfaceController.setVideoSize(mVideoWidth, mVideoHeight, mVideoAspect);
          if (mEffectRenderer != null)
                  mEffectRenderer.setVideoSize(mVideoWidth, mVideoHeight, mVideoAspect);
@@ -1002,10 +1180,10 @@ index 77fa0932..bf57b216 100644
  
      public void onVideoAspectChanged(IMediaPlayer mp, double aspect) {
 diff --git a/src/main/java/com/archos/mediacenter/video/player/PlayerActivity.java b/src/main/java/com/archos/mediacenter/video/player/PlayerActivity.java
-index c9b67b04..885c9714 100644
+index fee3c1e4..6c6192d9 100644
 --- a/src/main/java/com/archos/mediacenter/video/player/PlayerActivity.java
 +++ b/src/main/java/com/archos/mediacenter/video/player/PlayerActivity.java
-@@ -107,6 +107,7 @@ import com.archos.filecorelibrary.FileUtils;
+@@ -109,6 +109,7 @@ import com.archos.filecorelibrary.FileUtils;
  import com.archos.mediacenter.utils.MediaUtils;
  import com.archos.mediacenter.utils.introdb.IntroSegments;
  import com.archos.mediacenter.utils.videodb.IndexHelper;
@@ -1013,7 +1191,7 @@ index c9b67b04..885c9714 100644
  import com.archos.mediacenter.utils.videodb.VideoDbInfo;
  import com.archos.mediacenter.video.CustomApplication;
  import com.archos.mediacenter.video.R;
-@@ -154,6 +155,7 @@ import java.beans.PropertyChangeListener;
+@@ -156,6 +157,7 @@ import java.beans.PropertyChangeListener;
  import java.io.File;
  import java.util.ArrayList;
  import java.util.HashMap;
@@ -1021,7 +1199,7 @@ index c9b67b04..885c9714 100644
  import java.util.Map;
  import java.util.Objects;
  import java.util.UUID;
-@@ -220,6 +222,8 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -222,6 +224,8 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
      private static final String KEY_NETWORK_BOOKMARKS = "network_bookmarks";
      private static final String KEY_LOCK_ROTATION = "pref_lock_rotation";
      public static final String KEY_ADVANCED_VIDEO_ENABLED = "preferences_advanced_video_enabled";
@@ -1030,7 +1208,7 @@ index c9b67b04..885c9714 100644
  
      public static final String INDEXED_URI = "indexed_uri";
      public static final String KEY_TORRENT="torrent";
-@@ -293,6 +297,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -295,6 +299,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
      // screen cutouts
      public static int mCutoutLeft, mCutoutTop, mCutoutRight, mCutoutBottom;
      private static boolean mFullScreenWithCutout = true;
@@ -1038,7 +1216,7 @@ index c9b67b04..885c9714 100644
  
      private NetworkState networkState = null;
      private PropertyChangeListener propertyChangeListener = null;
-@@ -423,6 +428,10 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -425,6 +430,10 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
      private VideoDbInfo mVideoInfo;
      private IndexHelper mIndexHelper = null;
  
@@ -1049,7 +1227,7 @@ index c9b67b04..885c9714 100644
      private boolean mNetworkStateListenerAdded = false;
      private boolean mCling = false;
  
-@@ -740,6 +749,21 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -742,6 +751,21 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          setContentView(R.layout.player);
          mRootView = findViewById(R.id.root);
          mRootView.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
@@ -1071,7 +1249,7 @@ index c9b67b04..885c9714 100644
  
          mRootView.setOnApplyWindowInsetsListener( new View.OnApplyWindowInsetsListener() {
              @Override
-@@ -1027,11 +1051,189 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -1029,11 +1053,189 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
                  Toast.LENGTH_SHORT).show();
          Intent intent = new Intent(this, PlayerService.class);
          bindService(intent, mPlayerServiceConnection, BIND_AUTO_CREATE);
@@ -1264,7 +1442,7 @@ index c9b67b04..885c9714 100644
      }
  
      @SuppressWarnings("deprecation") // Bundle.get(key) is required for the untyped external header bundle.
-@@ -1159,6 +1361,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -1161,6 +1363,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          }
  
          mWasInPictureInPicture = false;
@@ -1272,15 +1450,15 @@ index c9b67b04..885c9714 100644
      }
  
      @SuppressWarnings("deprecation") // requestVisibleBehind: deprecated API 26, no replacement for Android TV
-@@ -1166,6 +1369,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
-     protected void onPause() {
+@@ -1170,6 +1373,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+         if (isFinishing() && !mLaunchFloatingPlayer && mPlayer != null) mPlayer.beginPlaybackExit();
          super.onPause();
          if (log.isDebugEnabled()) log.debug("onPause");
 +        if (mPauseScreensaver != null) mPauseScreensaver.stop();
  
          // Clock (for leanback devices only)
          if (getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK) || isChromeOS(mContext)) {
-@@ -1213,6 +1417,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -1217,6 +1421,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
      protected void onStop() {
          super.onStop();
          if (log.isDebugEnabled()) log.debug("onStop");
@@ -1288,7 +1466,7 @@ index c9b67b04..885c9714 100644
  
          // Refresh the service-owned handoff position in case playback continued behind Home.
          if (PlayerService.sPlayerService != null) {
-@@ -1261,6 +1466,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -1265,6 +1470,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
      @Override
      protected void onDestroy() {
          if (log.isDebugEnabled()) log.debug("onDestroy");
@@ -1296,7 +1474,7 @@ index c9b67b04..885c9714 100644
  
          // System-driven destruction after Home/screensaver is not an external-player exit.
          // finish() normally sends first; this guarded fallback covers framework finish paths.
-@@ -1498,7 +1704,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -1521,7 +1727,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          if(mWasInPictureInPicture) {
              if (PlayerService.sPlayerService != null) {
                  PlayerService.sPlayerService.stopAndSaveVideoState();
@@ -1305,7 +1483,7 @@ index c9b67b04..885c9714 100644
              }
          }
      }
-@@ -1528,9 +1734,33 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -1551,9 +1757,33 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          return handled ? true : super.onKeyUp(keyCode, event);
      }
  
@@ -1339,7 +1517,7 @@ index c9b67b04..885c9714 100644
  
          boolean handle = false;
          if(mPlayerController!=null)
-@@ -3266,6 +3496,31 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3289,6 +3519,31 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
  
      private final static String SHOW_FORMAT = "%s  -  S%02dE%02d  -  %s";
  
@@ -1371,7 +1549,7 @@ index c9b67b04..885c9714 100644
      public void setVideoInfo(VideoDbInfo info){
          mVideoInfo = info;
          int viewMode = VideoEffect.getDefaultMode();
-@@ -3282,9 +3537,6 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3305,9 +3560,6 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
  
              if (getIntent() != null && mUri != null) {
                  getIntent().setData(mUri);
@@ -1381,7 +1559,7 @@ index c9b67b04..885c9714 100644
              }
  
              if (!mCling && !TextUtils.isEmpty(mVideoInfo.title)) {
-@@ -3299,7 +3551,11 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3322,7 +3574,11 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
                  mMovieOrShowName = mVideoInfo.scraperTitle;
                  if (mMovieOrShowName != null) {
                      if (mVideoInfo.isShow) {
@@ -1394,7 +1572,7 @@ index c9b67b04..885c9714 100644
                      } else {
                          mTitle = mMovieOrShowName;
                      }
-@@ -3307,6 +3563,12 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3330,6 +3586,12 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
                  if (!TextUtils.isEmpty(mVideoInfo.scraperCover)) {
                      mPosterPath = mVideoInfo.scraperCover;
                  }
@@ -1407,7 +1585,7 @@ index c9b67b04..885c9714 100644
              }
  
              switch (mVideoInfo.videoStereo) {
-@@ -3352,7 +3614,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3375,7 +3637,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
              }
          }
  
@@ -1416,7 +1594,7 @@ index c9b67b04..885c9714 100644
          if (log.isDebugEnabled()) log.debug("setVideoInfo: mTitle {}, call postVideoInfoAndPrepared", mTitle);
          postVideoInfoAndPrepared();
      }
-@@ -3361,6 +3623,9 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3384,6 +3646,9 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
       * set start state = removing progress + enabling controllers
       */
      private void  postVideoInfoAndPrepared() {
@@ -1426,7 +1604,7 @@ index c9b67b04..885c9714 100644
          if (log.isDebugEnabled()) log.debug("postVideoInfoAndPrepared mVideoInfo!= null && (PlayerState PREPARED || PLAYING)={}", String.valueOf((PlayerService.sPlayerService.mPlayerState == PlayerService.PlayerState.PREPARED||PlayerService.sPlayerService.mPlayerState == PlayerService.PlayerState.PLAYING) && mVideoInfo != null));
          // ex onStreamingUriOK
          if ((PlayerService.sPlayerService.mPlayerState == PlayerService.PlayerState.PREPARED||PlayerService.sPlayerService.mPlayerState == PlayerService.PlayerState.PLAYING) && mVideoInfo != null) {
-@@ -3373,6 +3638,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3396,6 +3661,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
              mProgressView.setVisibility(View.GONE);
              PlayerService.sPlayerService.setAudioFilt();
              mPlayerController.start();
@@ -1434,7 +1612,7 @@ index c9b67b04..885c9714 100644
              // Now that the video is loaded, Video info should be avalaible
              if (mInfoMenuItem != null) {
                  mInfoMenuItem.setVisible(mStreamingUri != null);
-@@ -3393,7 +3659,13 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3416,7 +3682,13 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
      }
  
      private void selectVideoInfo(VideoDbInfo videoInfo, PlayerService.ResumeSource resumeSource) {
@@ -1448,7 +1626,7 @@ index c9b67b04..885c9714 100644
          if (PlayerService.sPlayerService != null) {
              PlayerService.sPlayerService.setVideoInfo(mVideoInfo, resumeSource);
              PlayerService.sPlayerService.requestIndexAndScrap();
-@@ -3403,7 +3675,12 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3426,7 +3698,12 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
  
      @Override
      public void onScraped(ScrapeDetailResult result) {
@@ -1462,7 +1640,7 @@ index c9b67b04..885c9714 100644
      }
  
      /**
-@@ -3436,7 +3713,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3459,7 +3736,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
  
          mPlayerController.setMediaPlayer(mPlayer);
  
@@ -1471,7 +1649,7 @@ index c9b67b04..885c9714 100644
          //mVideoId = getIntent().getIntExtra("id", -1);
  
          mCling = intent.getBooleanExtra("cling", false);
-@@ -4289,6 +4566,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -4314,6 +4591,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          public void onSeekStart(int pos) {
              if (mSubtitleManager != null)
                  mSubtitleManager.onSeekStart(pos);
@@ -1479,7 +1657,7 @@ index c9b67b04..885c9714 100644
          }
  
          public void onSeekComplete() {
-@@ -4302,6 +4580,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -4327,6 +4605,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          }
  
          public void onPlay(int state) {
@@ -1487,7 +1665,7 @@ index c9b67b04..885c9714 100644
              if (mSubtitleManager != null)
                  mSubtitleManager.onPlay();
              sendVideoStateChanged();
-@@ -4327,6 +4606,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -4352,6 +4631,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
              refreshPhonePlayModeIntroSummary();
          }
          public void onPause(int state) {
@@ -1495,7 +1673,7 @@ index c9b67b04..885c9714 100644
  
              if (mSubtitleManager != null)
                  mSubtitleManager.onPause();
-@@ -4350,9 +4630,12 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -4375,9 +4655,12 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          public void onOSDUpdate() {
              if (mPlayerController != null)
                  mPlayerController.setEnabled(true);
@@ -1508,7 +1686,7 @@ index c9b67b04..885c9714 100644
              if (isStereoEffectOn()) {
                  int mode = vMetadata.getVideoTrack().s3dMode;
                  if (mode != 0) {
-@@ -4513,7 +4796,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -4538,7 +4821,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          @Override
          public void onVideoDb(final VideoDbInfo localVideoInfo, final VideoDbInfo remoteVideoInfo) {
              if (log.isDebugEnabled()) log.debug("onVideoDb: localVideoInfo.subtitleTrack={}, remoteVideoInfo.subtitleTrack={}", ((localVideoInfo != null) ? localVideoInfo.subtitleTrack : "none"), ((remoteVideoInfo != null) ? remoteVideoInfo.subtitleTrack : "none"));
@@ -1517,7 +1695,7 @@ index c9b67b04..885c9714 100644
              if (log.isDebugEnabled()) log.debug("onVideoDb: localVideoInfo.lastTimePlayed: {}, remoteVideoInfo.lastTimePlayed: {}", ((localVideoInfo != null) ? localVideoInfo.lastTimePlayed : "none"), ((remoteVideoInfo != null) ? remoteVideoInfo.lastTimePlayed : "none"));
              if (localVideoInfo != null) {
                  if (remoteVideoInfo != null) {
-@@ -4589,6 +4872,11 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -4614,6 +4897,11 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
  
          @Override
          public void setUri(Uri uri, Uri streamingUri){
@@ -1529,7 +1707,7 @@ index c9b67b04..885c9714 100644
              mUri = uri;
              mStreamingUri = streamingUri;
              if (getIntent() != null) {
-@@ -4599,15 +4887,23 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -4624,15 +4912,23 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
                      getIntent().removeExtra(KEY_STREAMING_URI);
                  }
              }
