@@ -350,7 +350,7 @@ index 00000000..73644bb4
 +    }
 +}
 diff --git a/src/com/archos/mediacenter/utils/videodb/IndexHelper.java b/src/com/archos/mediacenter/utils/videodb/IndexHelper.java
-index d53f1662..a70099bf 100644
+index d53f1662..924c2c3e 100644
 --- a/src/com/archos/mediacenter/utils/videodb/IndexHelper.java
 +++ b/src/com/archos/mediacenter/utils/videodb/IndexHelper.java
 @@ -82,6 +82,7 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
@@ -361,21 +361,15 @@ index d53f1662..a70099bf 100644
          private final Uri mFile;
          private final long mVideoId;
          private volatile Listener mListener;
-@@ -95,7 +96,12 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
+@@ -95,6 +96,7 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
  
          public ScraperTask(Context context, Uri file, String title, long id) {
              mContext = context;
--            mFile = title != null ? Uri.parse("/"+title+".mp4") : file;
 +            mSourceUri = file;
-+            // An explicit title (e.g. a torrent topic passed by TorrServe) describes the content
-+            // better than a stream URL: scrape a synthetic file name built from it. Without a
-+            // usable title keep the real file so that NFO files and folder names are honoured.
-+            String scraperFileName = StreamTitleResolver.buildScraperFileName(file, title);
-+            mFile = scraperFileName != null ? Uri.parse("/" + scraperFileName) : file;
+             mFile = title != null ? Uri.parse("/"+title+".mp4") : file;
              mVideoId = id;
          }
- 
-@@ -104,7 +110,7 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
+@@ -104,7 +106,7 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
          }
  
          public void abort() {
@@ -384,7 +378,7 @@ index d53f1662..a70099bf 100644
              isCancelled = true;
              executor.shutdownNow();
              mListener = null;
-@@ -129,7 +135,7 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
+@@ -129,7 +131,7 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
  
          public void execute() {
              if (mListener != null)
@@ -393,7 +387,7 @@ index d53f1662..a70099bf 100644
              executor.execute(() -> {
                  ScrapeDetailResult result = null;
                  try {
-@@ -146,7 +152,7 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
+@@ -146,7 +148,7 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
                  handler.post(() -> {
                      if (isCancelled) return;
                      if (listener != null) {
@@ -402,7 +396,7 @@ index d53f1662..a70099bf 100644
                          listener.onScraperTaskResult(finalResult);
                      }
                  });
-@@ -266,32 +272,41 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
+@@ -266,32 +268,41 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
  
          ContentResolver cr = mContext.getContentResolver();
          mLocalVideoInfo = mVideoId == -1 ? VideoDbInfo.fromUri(cr, mUri) : VideoDbInfo.fromId(cr, mVideoId);
@@ -457,7 +451,7 @@ index d53f1662..a70099bf 100644
                  mHasRetrieveRemote = true;
                  XmlDb xmlDb = XmlDb.getInstance();
                  mRemoteXmlObserver = new XmlObserver(videoInfo.uri);
-@@ -300,12 +315,14 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
+@@ -300,12 +311,14 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
              }
              return;
          }
@@ -478,7 +472,7 @@ index d53f1662..a70099bf 100644
          if (mListener != null) {
              if (log.isDebugEnabled()) log.debug("onVideoDbInfo {} {}", mLocalVideoInfo, mRemoteVideoInfo);
              mListener.onVideoDb(mLocalVideoInfo, mRemoteVideoInfo);
-@@ -316,10 +333,12 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
+@@ -316,10 +329,12 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
          if (mUri == null)
              return;
  
@@ -492,7 +486,7 @@ index d53f1662..a70099bf 100644
                      mListener.onScraped(result);
              }
          };
-@@ -426,6 +445,8 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
+@@ -426,6 +441,8 @@ public class IndexHelper implements LoaderManager.LoaderCallbacks<Cursor>, Loade
                      else
                          values.putNull(VideoStore.Video.VideoColumns.ARCHOS_SUBTITLE_LANGUAGE);
                      resolver.update(VideoStore.Video.Media.EXTERNAL_CONTENT_URI, values, where, null);
@@ -503,10 +497,10 @@ index d53f1662..a70099bf 100644
                  if (exportDb && !FileUtils.isLocal(snapshot.uri) && snapshot.duration > 0
 diff --git a/src/com/archos/mediacenter/utils/videodb/StreamTitleResolver.java b/src/com/archos/mediacenter/utils/videodb/StreamTitleResolver.java
 new file mode 100644
-index 00000000..76e5d55e
+index 00000000..c111b023
 --- /dev/null
 +++ b/src/com/archos/mediacenter/utils/videodb/StreamTitleResolver.java
-@@ -0,0 +1,492 @@
+@@ -0,0 +1,159 @@
 +// Copyright 2026 Archos SA / Nova Video Player Project
 +//
 +// Licensed under the Apache License, Version 2.0 (the "License");
@@ -526,134 +520,51 @@ index 00000000..76e5d55e
 +import android.net.Uri;
 +
 +import com.archos.mediascraper.ShowUtils;
-+import com.archos.mediascraper.preprocess.ParseUtils;
 +
 +import java.util.Locale;
 +import java.util.Map;
-+import java.util.regex.Matcher;
 +import java.util.regex.Pattern;
 +
 +/**
-+ * Resolves clean, human-readable titles, show names, seasons and episode numbers for video
-+ * streams (TorrServe, AceStream, HTTP playlists...).
++ * Title shown for a video stream (TorrServe, AceStream, HTTP playlists...) until it is scraped.
 + *
-+ * Torrent streamers usually pass the tracker topic of the whole release as the title
-+ * (e.g. "Во все тяжкие / Breaking Bad / Сезон: 1 / Серии: 1-7 из 7 [2008, WEB-DL]") while the
-+ * stream URI carries the actual file name ("/stream/Breaking.Bad.S01E03.mkv"). The resolver
-+ * combines both: the localized show name comes from the topic, the episode from the file name.
-+ *
-+ * All regular expressions spell out Unicode word boundaries instead of relying on {@code \b},
-+ * whose Cyrillic handling differs between desktop JDKs (ASCII-only since JDK 19) and Android's
-+ * ICU-based engine.
++ * The title given by the launching application (e.g. the torrent topic) is shown as is; when
++ * the stream's file name identifies an episode ("/stream/Show.S04E07.mkv"), its number is
++ * appended. Once the file name is scraped, the scraped title replaces this one.
 + */
 +public final class StreamTitleResolver {
 +
-+    private static final String SHOW_FORMAT = "%s  -  S%02dE%02d  -  %s";
-+    private static final String SHOW_FORMAT_NO_EP_TITLE = "%s  -  S%02dE%02d";
-+    private static final String EPISODE_FORMAT = "S%02dE%02d  -  %s";
-+    private static final String EPISODE_FORMAT_NO_EP_TITLE = "S%02dE%02d";
++    private static final String EPISODE_SUFFIX = "%s  -  S%02dE%02d";
 +    private static final String DEFAULT_TITLE = "Video";
 +
-+    private static final int FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
-+    private static final String WB_START = "(?<![\\p{L}\\p{N}])";
-+    private static final String WB_END = "(?![\\p{L}\\p{N}])";
-+    private static final String NON_WORD_OR_START = "(?:^|[^\\p{L}\\p{N}])";
-+    private static final String SEP_OR_START = "(?:^|[\\s._\\[(-])";
-+    private static final String DASH = "[-–—]";
-+    private static final String SEASON_WORDS = "(?:сезон|season)";
-+    private static final String EPISODE_WORDS = "(?:серии|серия|эпизоды|эпизод|episodes|episode|eps|ep)";
-+    private static final String SEGMENT_MARKER_WORDS = "(?:сезон|season|серии|серия|эпизоды|эпизод|episodes|episode|выпуски|выпуск)";
-+    private static final String RELEASE_WORDS = "(?:web-?dl|web-?rip|bdrip|hdrip|hdtv|1080p|720p|2160p|4k|hdr|mvo|dvo|avo|sub|dub|lostfilm|newstudio|hdrezka|amedia)";
++    private static final Pattern VIDEO_EXTENSION = Pattern.compile(
++            "\\.(?:mkv|mp4|m4v|avi|mov|wmv|webm|flv|ts|m2ts|mts|mpg|mpeg|vob|iso|3gp|ogv|divx|rmvb|m3u8?)$",
++            Pattern.CASE_INSENSITIVE);
 +
-+    // Torrent topic (batch release) detection
-+    private static final Pattern RANGE_WITH_TOTAL = p("(?<!\\d)\\d{1,3}\\s*" + DASH + "\\s*\\d{1,3}(?!\\d).*?(?:из|of)\\s*\\d{1,3}");
-+    private static final Pattern BRACKETED_RANGE = p("\\[\\s*\\d{1,3}\\s*(?:" + DASH + "|x)\\s*\\d{1,3}(?:\\s*(?:из|of)\\s*\\d{1,3})?\\s*\\]");
-+    private static final Pattern EPISODE_RANGE = p(WB_START + EPISODE_WORDS + "\\s*[:_]?\\s*\\d{1,3}\\s*" + DASH + "\\s*\\d{1,3}(?!\\d)");
-+    private static final Pattern WHOLE_SEASON = p(WB_START + SEASON_WORDS + "\\s*[:_]?\\s*\\d{1,2}(?!\\d)");
-+    private static final Pattern RELEASE_TAG_IN_BRACKETS = p("\\[[^\\]]*?(?:rip|web|1080|720|2160|mvo|dvo|lostfilm|newstudio|hdrezka|amedia|кубик)[^\\]]*\\]");
-+
-+    // Episode markers in file names
-+    private static final Pattern SXX_EXX = p(SEP_OR_START + "s(\\d{1,2})[\\s._-]*e(\\d{1,3})(?!\\d)");
-+    private static final Pattern SX_EX = p(SEP_OR_START + "(\\d{1,2})x(\\d{1,3})(?!\\d)");
-+    private static final Pattern EPISODE_WORD_NUMBER = p(SEP_OR_START + "(?:серия|серии|эпизод|episode|ep)[\\s._:-]*(\\d{1,3})(?!\\d)");
-+    private static final Pattern NUMBER_EPISODE_WORD = p(SEP_OR_START + "(\\d{1,3})[\\s._-]*(?:серия|эпизод)" + WB_END);
-+    private static final Pattern LEADING_EPISODE_NUMBER = Pattern.compile("^0*(\\d{1,3})[\\s._-]+(.+)?");
-+    private static final Pattern SEASON_NUMBER = p(NON_WORD_OR_START + SEASON_WORDS + "[\\s._:-]*(\\d{1,2})(?!\\d)");
-+    private static final Pattern NUMBER_SEASON = p(NON_WORD_OR_START + "(\\d{1,2})[\\s._-]*" + SEASON_WORDS + WB_END);
-+    private static final Pattern SERIES_HINT = p(WB_START + "(?:сериал|серии|серия|эпизоды|эпизод|episodes|сезон|season)" + WB_END);
-+
-+    // Episode markers stripped from show names
-+    private static final Pattern TAIL_DASH_SXX_EXX = p("\\s*" + DASH + "+\\s*s\\d{1,2}[\\s._-]*e\\d{1,3}.*");
-+    private static final Pattern TAIL_DASH_SX_EX = p("\\s*" + DASH + "+\\s*\\d{1,2}x\\d{1,3}.*");
-+    private static final Pattern TAIL_SXX_EXX = p(SEP_OR_START + "s\\d{1,2}[\\s._-]*e\\d{1,3}(?!\\d).*");
-+    private static final Pattern TAIL_SX_EX = p(SEP_OR_START + "\\d{1,2}x\\d{1,3}(?!\\d).*");
-+    private static final Pattern TAIL_SEASON = p(NON_WORD_OR_START + SEASON_WORDS + "[\\s._:-]*\\d{1,2}.*");
-+    private static final Pattern TAIL_EPISODE = p(NON_WORD_OR_START + "(?:серия|серии|эпизод|episode|ep)[\\s._:-]*\\d{1,3}.*");
-+
-+    // Torrent topic cleanup
-+    private static final Pattern BRACKETS = Pattern.compile("\\[[^\\]]*\\]");
-+    private static final Pattern METADATA_PARENS = p("\\([^)]*(?:сезон|сери|эпизод|season|episode|\\d{4}|из\\s*\\d+|мини-сериал)[^)]*\\)");
-+    private static final Pattern TRAILING_PARENS = Pattern.compile("\\s*\\([^)]*\\)\\s*$");
-+    private static final Pattern SEGMENT_MARKER = p(WB_START + SEGMENT_MARKER_WORDS + WB_END);
-+    private static final Pattern DIGIT = Pattern.compile("\\d");
-+    private static final Pattern NUMBER_RANGE = Pattern.compile("(?<!\\d)\\d{1,3}\\s*" + DASH + "\\s*\\d{1,3}(?!\\d)");
-+    private static final Pattern RELEASE_WORD = p(WB_START + RELEASE_WORDS + WB_END);
-+    private static final Pattern SEASON_TEXT = p(NON_WORD_OR_START + SEASON_WORDS + "[^\\p{L}\\p{N}]*\\d{1,2}(?!\\d)");
-+    private static final Pattern EPISODE_RANGE_TEXT = p(NON_WORD_OR_START + EPISODE_WORDS + "[^\\p{L}\\p{N}]*\\d{1,3}\\s*" + DASH + "\\s*\\d{1,3}(?:\\s*(?:из|of)\\s*\\d{1,3})?");
-+    private static final Pattern COUNTED_EPISODES_TEXT = p(NON_WORD_OR_START + "\\d{1,3}(?:\\s*" + DASH + "\\s*\\d{1,3})?\\s*" + EPISODE_WORDS + WB_END);
-+    private static final Pattern RANGE_OF_TOTAL = p("(?<!\\d)\\d{1,3}\\s*" + DASH + "\\s*\\d{1,3}\\s*(?:из|of)\\s*\\d{1,3}(?!\\d)");
-+    // Release artifacts are only cut when something precedes them ("Original Sin", "Sub Rosa" survive)
-+    private static final Pattern RELEASE_TAIL = p("(?<=\\S)\\s+(?:" + RELEASE_WORDS + "|кубик\\s*в\\s*кубе)" + WB_END + ".*$");
-+    private static final Pattern YEAR_IN_BRACKETS = Pattern.compile("[\\[(][^\\])]*?(?<!\\d)((?:19|20)\\d{2})(?!\\d)");
-+
-+    private static final Pattern TRAILING_DELIMITERS = Pattern.compile("[\\s._/\\-:;,]+$");
-+    private static final Pattern LEADING_DELIMITERS = Pattern.compile("^[\\s._/\\-:;,]+");
-+    private static final Pattern FILE_NAME_SEPARATORS = Pattern.compile("[._]+");
-+    private static final Pattern SPACES = Pattern.compile("\\s+");
-+    private static final Pattern VIDEO_EXTENSION = p("\\.(?:mkv|mp4|m4v|avi|mov|wmv|webm|flv|ts|m2ts|mts|mpg|mpeg|vob|iso|3gp|ogv|divx|rmvb|m3u8?)$");
++    // Tags in front of a torrent topic, e.g. TorrServe's category "[NUM] "
++    private static final Pattern LEADING_TAGS = Pattern.compile("^(?:\\[[^\\]]*\\]\\s*)+");
 +
 +    private static final String[] PLACEHOLDER_NAMES = {"stream", "play", "video", "file", "link", "index"};
 +    private static final String[] NAME_QUERY_PARAMETERS = {"fname", "title", "name", "file"};
 +
 +    public static final class Result {
-+        public final String title;          // Formatted title for OSD (e.g. "Show Name  -  S01E03  -  Title")
-+        public final String showName;       // Base show name, or null
-+        public final int season;            // Season number, or -1 if unknown
-+        public final int episode;           // Episode number, or -1 if unknown
-+        public final String episodeTitle;   // Episode title, or null
-+        public final boolean isTvShow;      // True if resolved as a TV show episode
-+        public final String fileName;       // File name extracted from the stream URI, or null
-+        public final String year;           // Release year found in the title (movies), or null
++        public final String title;      // Title for the OSD, e.g. "<source title>  -  S04E07"
++        public final String showName;   // Source title (or file name) without the episode suffix
++        public final int season;        // -1 when the file name has no episode number
++        public final int episode;       // -1 when the file name has no episode number
++        public final boolean isTvShow;
 +
-+        public Result(String title, String showName, int season, int episode, String episodeTitle,
-+                      boolean isTvShow, String fileName, String year) {
++        Result(String title, String showName, int season, int episode) {
 +            this.title = title;
 +            this.showName = showName;
 +            this.season = season;
 +            this.episode = episode;
-+            this.episodeTitle = episodeTitle;
-+            this.isTvShow = isTvShow;
-+            this.fileName = fileName;
-+            this.year = year;
++            this.isTvShow = episode >= 0;
 +        }
 +
 +        @Override
 +        public String toString() {
-+            return "Result{title='" + title + "', isTvShow=" + isTvShow + ", S=" + season + ", E=" + episode + ", year=" + year + "}";
-+        }
-+    }
-+
-+    private static final class EpisodeInfo {
-+        final String showName;
-+        final int season;
-+        final int episode;
-+        final String episodeTitle;
-+
-+        EpisodeInfo(String showName, int season, int episode, String episodeTitle) {
-+            this.showName = showName;
-+            this.season = season;
-+            this.episode = episode;
-+            this.episodeTitle = episodeTitle;
++            return "Result{title='" + title + "', S=" + season + ", E=" + episode + "}";
 +        }
 +    }
 +
@@ -661,102 +572,30 @@ index 00000000..76e5d55e
 +    }
 +
 +    /**
-+     * Whether the given string looks like a torrent batch/topic release title rather than the
-+     * name of a single episode or movie.
++     * @param uri         the stream URI (its file name may carry the episode number)
++     * @param sourceTitle the title passed by the launching application, shown unchanged
 +     */
-+    public static boolean isTorrentTopicTitle(String title) {
-+        if (isBlank(title)) return false;
-+        String t = title.trim();
-+        return RANGE_WITH_TOTAL.matcher(t).find()
-+                || BRACKETED_RANGE.matcher(t).find()
-+                || EPISODE_RANGE.matcher(t).find()
-+                || (WHOLE_SEASON.matcher(t).find() && !SXX_EXX.matcher(t).find())
-+                || RELEASE_TAG_IN_BRACKETS.matcher(t).find();
-+    }
++    public static Result resolve(Uri uri, String sourceTitle) {
++        String fileName = extractFileName(uri);
++        String source = !isBlank(sourceTitle) ? LEADING_TAGS.matcher(sourceTitle.trim()).replaceFirst("") : null;
++        String name = !isBlank(source) ? source : fileName != null ? fileName : DEFAULT_TITLE;
 +
-+    /**
-+     * Strips episode markers (e.g. "S04E10", "4x10", "Сезон 4 Серия 10", " - S04E10") and
-+     * everything after them from a show title, so that numbering is never printed twice.
-+     */
-+    public static String stripEpisodeMarkers(String name) {
-+        if (isBlank(name)) return "";
-+        String s = name.trim();
-+        s = TAIL_DASH_SXX_EXX.matcher(s).replaceAll("");
-+        s = TAIL_DASH_SX_EX.matcher(s).replaceAll("");
-+        s = TAIL_SXX_EXX.matcher(s).replaceAll("");
-+        s = TAIL_SX_EX.matcher(s).replaceAll("");
-+        s = TAIL_SEASON.matcher(s).replaceAll("");
-+        s = TAIL_EPISODE.matcher(s).replaceAll("");
-+        return tidy(s);
-+    }
-+
-+    /**
-+     * Cleans a torrent topic title down to the show or movie name (Russian and/or English),
-+     * removing bracketed release info, season/episode ranges and release artifacts.
-+     */
-+    public static String cleanShowNameFromTorrentTitle(String title) {
-+        if (isBlank(title)) return "";
-+        String s = title.trim();
-+
-+        // 1. Bracketed release info like [2008, WEB-DL 1080p, MVO]
-+        s = BRACKETS.matcher(s).replaceAll(" ");
-+
-+        // 2. Parenthesized season/episode/year info, then a trailing author/director note
-+        s = METADATA_PARENS.matcher(s).replaceAll(" ");
-+        s = TRAILING_PARENS.matcher(s).replaceAll(" ");
-+
-+        // 3. "Во все тяжкие / Breaking Bad / Сезон: 1 / Серии: 1-7 из 7": keep the title segments
-+        if (s.contains("/")) {
-+            StringBuilder sb = new StringBuilder();
-+            for (String part : s.split("/")) {
-+                if (isMetadataSegment(part)) continue;
-+                String cleanPart = stripEpisodeMarkers(part);
-+                if (!cleanPart.isEmpty()) {
-+                    if (sb.length() > 0) sb.append(" / ");
-+                    sb.append(cleanPart);
-+                }
-+            }
-+            if (sb.length() > 0) {
-+                s = sb.toString();
-+            }
++        Map<String, String> parsed = fileName != null ? ShowUtils.parseShowName(fileName) : null;
++        Integer season = parsed != null ? parseInteger(parsed.get(ShowUtils.SEASON)) : null;
++        Integer episode = parsed != null ? parseInteger(parsed.get(ShowUtils.EPNUM)) : null;
++        if (season == null || episode == null) {
++            return new Result(name, name, -1, -1);
 +        }
-+
-+        // 4. Season/episode text sections: "Сезон 1", "Серии 1-7 из 7", "1-8 серии"
-+        s = SEASON_TEXT.matcher(s).replaceAll(" ");
-+        s = EPISODE_RANGE_TEXT.matcher(s).replaceAll(" ");
-+        s = COUNTED_EPISODES_TEXT.matcher(s).replaceAll(" ");
-+
-+        // 5. Standalone ranges like "01-08 из 08"
-+        s = RANGE_OF_TOTAL.matcher(s).replaceAll(" ");
-+
-+        // 6. Trailing release artifacts ("... WEB-DL 1080p")
-+        s = RELEASE_TAIL.matcher(s).replaceAll("");
-+
-+        // 7. Any episode marker left
-+        return stripEpisodeMarkers(s);
++        String marker = String.format(Locale.ROOT, "S%02dE%02d", season, episode);
++        String title = name.toUpperCase(Locale.ROOT).contains(marker)
++                ? name // the source title already names this episode
++                : String.format(Locale.ROOT, EPISODE_SUFFIX, name, season, episode);
++        return new Result(title, name, season, episode);
 +    }
 +
 +    /**
-+     * Returns the release year given in brackets or parentheses ("[2010, BDRip]", "(2010)"), or null.
-+     */
-+    public static String extractYear(String title) {
-+        if (isBlank(title)) return null;
-+        Matcher m = YEAR_IN_BRACKETS.matcher(title);
-+        return m.find() ? m.group(1) : null;
-+    }
-+
-+    /**
-+     * Removes a trailing video/playlist file extension. Unlike a generic extension stripper it
-+     * never cuts human titles such as "Mr. Robot" or "Слово пацана. Кровь на асфальте".
-+     */
-+    public static String stripVideoExtension(String name) {
-+        if (name == null) return null;
-+        return VIDEO_EXTENSION.matcher(name).replaceFirst("");
-+    }
-+
-+    /**
-+     * Extracts the meaningful file name from a stream URI, handling URL encoding, subfolders,
-+     * query parameters and generic endpoints ("/stream?title=...").
++     * File name (without video extension) of a stream URI, handling URL encoding, query
++     * parameters and generic endpoints ("/stream?title=..."), or null when there is none.
 +     */
 +    public static String extractFileName(Uri uri) {
 +        if (uri == null) return null;
@@ -772,8 +611,8 @@ index 00000000..76e5d55e
 +            pathPart = pathPart.substring(0, pathPart.length() - 1);
 +        }
 +
-+        // Decode percent-encoding (%2F -> /, %20 -> space, UTF-8 Cyrillic) before splitting so
-+        // that encoded subfolders ("Season%201%2FEpisode.mkv") yield the file name only
++        // Decode before splitting so that encoded subfolders ("Season%201%2FEpisode.mkv") yield
++        // the file name only
 +        String decodedPath = Uri.decode(pathPart);
 +        String name = null;
 +        if (!isBlank(decodedPath)) {
@@ -796,172 +635,8 @@ index 00000000..76e5d55e
 +        return isPlaceholderName(name) ? null : name.trim();
 +    }
 +
-+    /**
-+     * Resolves the best human-readable title, show name, season and episode.
-+     *
-+     * @param uri         the stream URI (may contain the real file name in its path or query)
-+     * @param intentTitle the title passed by the launching application (may be a torrent topic)
-+     */
-+    public static Result resolve(Uri uri, String intentTitle) {
-+        String title = intentTitle != null ? stripVideoExtension(intentTitle.trim()) : null;
-+        if (isBlank(title)) title = null;
-+        String fileName = extractFileName(uri);
-+        boolean isTopic = isTorrentTopicTitle(title);
-+
-+        // 1. The file name identifies the episode; the topic (if any) gives the localized show name
-+        EpisodeInfo fromFile = fileName != null ? parseEpisode(fileName, title, uri) : null;
-+        if (fromFile != null) {
-+            String show = title != null ? nonEmpty(cleanShowNameFromTorrentTitle(title)) : null;
-+            if (show == null) show = nonEmpty(stripEpisodeMarkers(fromFile.showName));
-+            return episodeResult(show, fromFile.season, fromFile.episode, fromFile.episodeTitle, fileName);
-+        }
-+
-+        // 2. No episode in the file name: the title itself may name a single episode
-+        if (title != null && !isTopic) {
-+            Map<String, String> parsed = ShowUtils.parseShowName(title);
-+            if (parsed != null) {
-+                Integer season = parseInteger(parsed.get(ShowUtils.SEASON));
-+                Integer episode = parseInteger(parsed.get(ShowUtils.EPNUM));
-+                if (season != null && episode != null) {
-+                    String episodeTitle = cleanEpisodeTitle(ShowUtils.extractEpisodeTitle(title, season, episode));
-+                    String show = nonEmpty(stripEpisodeMarkers(parsed.get(ShowUtils.SHOW)));
-+                    return episodeResult(show, season, episode, episodeTitle, fileName);
-+                }
-+            }
-+        }
-+
-+        // 3. Movie or unknown content
-+        String movieTitle = title == null ? null : nonEmpty(isTopic ? cleanShowNameFromTorrentTitle(title) : title);
-+        if (movieTitle == null) movieTitle = fileName != null ? fileName : DEFAULT_TITLE;
-+        return new Result(movieTitle, null, -1, -1, null, false, fileName, extractYear(title));
-+    }
-+
-+    /**
-+     * Builds the synthetic file name used to scrape a stream whose real file name is not
-+     * informative, e.g. "Во все тяжкие S01E03.mkv" or "Начало Inception (2010).mkv".
-+     *
-+     * @return the file name, or null when {@code title} is empty or nothing reliable could be
-+     *         derived: callers must then scrape the real file (which also keeps NFO lookups working)
-+     */
-+    public static String buildScraperFileName(Uri uri, String title) {
-+        if (isBlank(title)) return null;
-+        Result r = resolve(uri, title);
-+        String name;
-+        if (r.isTvShow) {
-+            if (isBlank(r.showName) || r.episode < 0) return null;
-+            name = String.format(Locale.ROOT, "%s S%02dE%02d", r.showName, Math.max(r.season, 1), r.episode);
-+        } else {
-+            if (isBlank(r.title) || DEFAULT_TITLE.equals(r.title)) return null;
-+            name = r.title;
-+            if (r.year != null && !name.contains(r.year)) {
-+                name += " (" + r.year + ")";
-+            }
-+        }
-+        // '/' would be read as a folder separator by the scraper preprocessing
-+        return name.replace('/', ' ') + ".mkv";
-+    }
-+
-+    private static boolean isMetadataSegment(String segment) {
-+        String p = segment.trim();
-+        if (p.isEmpty()) return true;
-+        return (SEGMENT_MARKER.matcher(p).find() && DIGIT.matcher(p).find())
-+                || NUMBER_RANGE.matcher(p).find()
-+                || RELEASE_WORD.matcher(p).find();
-+    }
-+
-+    private static EpisodeInfo parseEpisode(String fileName, String title, Uri uri) {
-+        Map<String, String> parsed = ShowUtils.parseShowName(fileName);
-+        if (parsed != null) {
-+            Integer season = parseInteger(parsed.get(ShowUtils.SEASON));
-+            Integer episode = parseInteger(parsed.get(ShowUtils.EPNUM));
-+            if (season != null && episode != null) {
-+                return new EpisodeInfo(parsed.get(ShowUtils.SHOW), season, episode,
-+                        cleanEpisodeTitle(ShowUtils.extractEpisodeTitle(fileName, season, episode)));
-+            }
-+        }
-+
-+        Matcher m = SXX_EXX.matcher(fileName);
-+        if (!m.find()) {
-+            m = SX_EX.matcher(fileName);
-+            if (!m.find()) m = null;
-+        }
-+        if (m != null) {
-+            int season = Integer.parseInt(m.group(1));
-+            int episode = Integer.parseInt(m.group(2));
-+            return new EpisodeInfo(guessShowName(fileName.substring(0, m.start())), season, episode,
-+                    cleanEpisodeTitle(ShowUtils.extractEpisodeTitle(fileName, season, episode)));
-+        }
-+
-+        m = EPISODE_WORD_NUMBER.matcher(fileName);
-+        if (!m.find()) {
-+            m = NUMBER_EPISODE_WORD.matcher(fileName);
-+            if (!m.find()) m = null;
-+        }
-+        if (m != null) {
-+            int episode = Integer.parseInt(m.group(1));
-+            int season = Math.max(findSeason(fileName, title, uri), 1);
-+            return new EpisodeInfo(guessShowName(fileName.substring(0, m.start())), season, episode,
-+                    cleanEpisodeTitle(ShowUtils.extractEpisodeTitle(fileName, season, episode)));
-+        }
-+
-+        // A bare leading number ("04 - Cancer Man") is only an episode number when the context
-+        // says we are in a series: many movies start with digits ("21.Jump.Street", "300").
-+        m = LEADING_EPISODE_NUMBER.matcher(fileName);
-+        if (m.find() && hasSeriesContext(fileName, title, uri)) {
-+            int episode = Integer.parseInt(m.group(1));
-+            int season = Math.max(findSeason(fileName, title, uri), 1);
-+            String remainder = m.group(2);
-+            String episodeTitle = remainder != null ? cleanEpisodeTitle(ParseUtils.cleanExtractedTitle(remainder)) : null;
-+            return new EpisodeInfo(null, season, episode, episodeTitle);
-+        }
-+        return null;
-+    }
-+
-+    private static boolean hasSeriesContext(String fileName, String title, Uri uri) {
-+        return findSeason(fileName, title, uri) > 0
-+                || (title != null && SERIES_HINT.matcher(title).find());
-+    }
-+
-+    /** Season number from the title, the file name or a parent folder, or -1. */
-+    private static int findSeason(String fileName, String title, Uri uri) {
-+        String path = uri != null ? uri.getPath() : null;
-+        for (String source : new String[]{title, fileName, path}) {
-+            if (source == null) continue;
-+            for (Pattern pattern : new Pattern[]{SEASON_NUMBER, NUMBER_SEASON}) {
-+                Matcher m = pattern.matcher(source);
-+                if (m.find()) return Integer.parseInt(m.group(1));
-+            }
-+        }
-+        return -1;
-+    }
-+
-+    private static String guessShowName(String prefix) {
-+        String name = tidy(FILE_NAME_SEPARATORS.matcher(prefix).replaceAll(" "));
-+        return name.isEmpty() ? null : name;
-+    }
-+
-+    private static Result episodeResult(String show, int season, int episode, String episodeTitle, String fileName) {
-+        int finalSeason = season > 0 ? season : 1;
-+        boolean hasEpisodeTitle = !isBlank(episodeTitle);
-+        String formatted;
-+        if (show != null) {
-+            formatted = hasEpisodeTitle
-+                    ? String.format(Locale.ROOT, SHOW_FORMAT, show, finalSeason, episode, episodeTitle)
-+                    : String.format(Locale.ROOT, SHOW_FORMAT_NO_EP_TITLE, show, finalSeason, episode);
-+        } else {
-+            formatted = hasEpisodeTitle
-+                    ? String.format(Locale.ROOT, EPISODE_FORMAT, finalSeason, episode, episodeTitle)
-+                    : String.format(Locale.ROOT, EPISODE_FORMAT_NO_EP_TITLE, finalSeason, episode);
-+        }
-+        return new Result(formatted, show, finalSeason, episode, hasEpisodeTitle ? episodeTitle : null, true, fileName, null);
-+    }
-+
-+    /** An episode title that still contains numbering is a leftover of the file name, not a title. */
-+    private static String cleanEpisodeTitle(String episodeTitle) {
-+        if (isBlank(episodeTitle)) return null;
-+        String t = episodeTitle.trim();
-+        if (SXX_EXX.matcher(t).find() || SX_EX.matcher(t).find()) return null;
-+        return t;
++    private static String stripVideoExtension(String name) {
++        return VIDEO_EXTENSION.matcher(name).replaceFirst("");
 +    }
 +
 +    private static boolean isPlaceholderName(String name) {
@@ -970,12 +645,6 @@ index 00000000..76e5d55e
 +            if (placeholder.equalsIgnoreCase(name)) return true;
 +        }
 +        return false;
-+    }
-+
-+    private static String tidy(String s) {
-+        s = TRAILING_DELIMITERS.matcher(s).replaceAll("");
-+        s = LEADING_DELIMITERS.matcher(s).replaceAll("");
-+        return SPACES.matcher(s).replaceAll(" ").trim();
 +    }
 +
 +    private static Integer parseInteger(String value) {
@@ -987,331 +656,10 @@ index 00000000..76e5d55e
 +        }
 +    }
 +
-+    private static String nonEmpty(String s) {
-+        return isBlank(s) ? null : s;
-+    }
-+
 +    private static boolean isBlank(String s) {
 +        return s == null || s.trim().isEmpty();
 +    }
-+
-+    private static Pattern p(String regex) {
-+        return Pattern.compile(regex, FLAGS);
-+    }
 +}
-diff --git a/src/com/archos/medialib/LibAvos.java b/src/com/archos/medialib/LibAvos.java
-index 961bd739..ae9a1cd6 100644
---- a/src/com/archos/medialib/LibAvos.java
-+++ b/src/com/archos/medialib/LibAvos.java
-@@ -384,7 +384,11 @@ public class LibAvos {
-     }
- 
-     public static void setAudioDecoder(int audioDecoder) {
--        nativeSetAudioDecoder(audioDecoder);
-+        try {
-+            nativeSetAudioDecoder(audioDecoder);
-+        } catch (UnsatisfiedLinkError ule) {
-+            warnMissingNative("nativeSetAudioDecoder", ule);
-+        }
-     }
- 
-     public static void setCodepage(int codepage) {
-@@ -405,15 +409,27 @@ public class LibAvos {
-     }
- 
-     public static void setMediaCodecAudioCapabilities(long mediaCodecAudioCapabilities) {
--        nativeSetMediaCodecAudioCapabilities(mediaCodecAudioCapabilities);
-+        try {
-+            nativeSetMediaCodecAudioCapabilities(mediaCodecAudioCapabilities);
-+        } catch (UnsatisfiedLinkError ule) {
-+            warnMissingNative("nativeSetMediaCodecAudioCapabilities", ule);
-+        }
-     }
- 
-     public static void setSpatializerCapabilities(int spatializerCapabilities) {
--        nativeSetSpatializerCapabilities(spatializerCapabilities);
-+        try {
-+            nativeSetSpatializerCapabilities(spatializerCapabilities);
-+        } catch (UnsatisfiedLinkError ule) {
-+            warnMissingNative("nativeSetSpatializerCapabilities", ule);
-+        }
-     }
- 
-     public static void setSpatializerEnabled(boolean enabled) {
--        nativeSetSpatializerEnabled(enabled);
-+        try {
-+            nativeSetSpatializerEnabled(enabled);
-+        } catch (UnsatisfiedLinkError ule) {
-+            warnMissingNative("nativeSetSpatializerEnabled", ule);
-+        }
-     }
- 
-     public static void setMaxPcmChannels(int maxChannels) {
-@@ -430,7 +446,19 @@ public class LibAvos {
-     }
- 
-     public static float getAudioSpeed() {
--        return nativeGetAudioSpeed();
-+        try {
-+            return nativeGetAudioSpeed();
-+        } catch (UnsatisfiedLinkError ule) {
-+            warnMissingNative("nativeGetAudioSpeed", ule);
-+            return 1.0f;
-+        }
-+    }
-+
-+    // Optional audio entry points are guarded so that a libavos.so older than this Java layer
-+    // degrades gracefully instead of crashing playback. Always log it: silently ignoring the
-+    // call would hide a stale native build.
-+    private static void warnMissingNative(String method, UnsatisfiedLinkError e) {
-+        Log.w(TAG, method + " is missing in libavos.so (native library older than MediaLib?)", e);
-     }
- 
-     public static void enableAudioSpeed(boolean enable) {
-diff --git a/src/com/archos/medialib/MediaMetadata.java b/src/com/archos/medialib/MediaMetadata.java
-index 32d001b8..ed74072b 100644
---- a/src/com/archos/medialib/MediaMetadata.java
-+++ b/src/com/archos/medialib/MediaMetadata.java
-@@ -291,7 +291,9 @@ public class MediaMetadata implements Parcelable
-      * {@hide}
-      */
-     public String getString(final int key) {
--        checkType(key, STRING_VAL);
-+        if (!checkType(key, STRING_VAL)) {
-+            return null;
-+        }
-         return mParcel.readString();
-     }
- 
-@@ -299,7 +301,9 @@ public class MediaMetadata implements Parcelable
-      * {@hide}
-      */
-     public int getInt(final int key) {
--        checkType(key, INTEGER_VAL);
-+        if (!checkType(key, INTEGER_VAL)) {
-+            return 0;
-+        }
-         return mParcel.readInt();
-     }
- 
-@@ -307,7 +311,9 @@ public class MediaMetadata implements Parcelable
-      * Get the boolean value indicated by key
-      */
-     public boolean getBoolean(final int key) {
--        checkType(key, BOOLEAN_VAL);
-+        if (!checkType(key, BOOLEAN_VAL)) {
-+            return false;
-+        }
-         return mParcel.readInt() == 1;
-     }
- 
-@@ -315,9 +321,9 @@ public class MediaMetadata implements Parcelable
-      * {@hide}
-      */
-     public long getLong(final int key) {
--        checkType(key, LONG_VAL);    /**
--     * {@hide}
--     */
-+        if (!checkType(key, LONG_VAL)) {
-+            return 0L;
-+        }
-         return mParcel.readLong();
-     }
- 
-@@ -325,7 +331,9 @@ public class MediaMetadata implements Parcelable
-      * {@hide}
-      */
-     public double getDouble(final int key) {
--        checkType(key, DOUBLE_VAL);
-+        if (!checkType(key, DOUBLE_VAL)) {
-+            return 0.0;
-+        }
-         return mParcel.readDouble();
-     }
- 
-@@ -333,7 +341,9 @@ public class MediaMetadata implements Parcelable
-      * {@hide}
-      */
-     public byte[] getByteArray(final int key) {
--        checkType(key, BYTE_ARRAY_VAL);
-+        if (!checkType(key, BYTE_ARRAY_VAL)) {
-+            return null;
-+        }
-         return mParcel.createByteArray();
-     }
- 
-@@ -341,7 +351,9 @@ public class MediaMetadata implements Parcelable
-      * {@hide}
-      */
-     public Date getDate(final int key) {
--        checkType(key, DATE_VAL);
-+        if (!checkType(key, DATE_VAL)) {
-+            return null;
-+        }
-         final long timeSinceEpoch = mParcel.readLong();
-         final String timeZone = mParcel.readString();
- 
-@@ -359,15 +371,20 @@ public class MediaMetadata implements Parcelable
-     /**
-      * Check the type of the data match what is expected.
-      */
--    private void checkType(final int key, final int expectedType) {
-+    private boolean checkType(final int key, final int expectedType) {
-+        if (!mKeyToPosMap.containsKey(key)) {
-+            return false;
-+        }
-         final int pos = mKeyToPosMap.get(key);
- 
-         mParcel.setDataPosition(pos);
- 
-         final int type = mParcel.readInt();
-         if (type != expectedType) {
--            throw new IllegalStateException("Wrong type " + expectedType + " but got " + type);
-+            Log.w(TAG, "Wrong type " + expectedType + " but got " + type + " for key " + key);
-+            return false;
-         }
-+        return true;
-     }
- 
-     public static final Parcelable.Creator<MediaMetadata> CREATOR
-diff --git a/src/com/archos/mediaprovider/video/PackagePathRemapper.java b/src/com/archos/mediaprovider/video/PackagePathRemapper.java
-new file mode 100644
-index 00000000..66b8ed60
---- /dev/null
-+++ b/src/com/archos/mediaprovider/video/PackagePathRemapper.java
-@@ -0,0 +1,120 @@
-+// Copyright 2026 Archos SA / Nova Video Player authors
-+//
-+// Licensed under the Apache License, Version 2.0 (the "License");
-+// you may not use this file except in compliance with the License.
-+// You may obtain a copy of the License at
-+//
-+//      http://www.apache.org/licenses/LICENSE-2.0
-+//
-+// Unless required by applicable law or agreed to in writing, software
-+// distributed under the License is distributed on an "AS IS" BASIS,
-+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-+// See the License for the specific language governing permissions and
-+// limitations under the License.
-+
-+package com.archos.mediaprovider.video;
-+
-+import android.database.Cursor;
-+import android.database.SQLException;
-+import android.database.sqlite.SQLiteDatabase;
-+
-+import org.slf4j.Logger;
-+import org.slf4j.LoggerFactory;
-+
-+import java.util.ArrayList;
-+import java.util.List;
-+
-+/**
-+ * Rewrites artwork/thumbnail paths stored under the private directory of another application
-+ * package (e.g. a media.db restored from a backup of a differently named Nova/Archos build).
-+ *
-+ * Paths are matched on the complete "/package/" directory segment, which makes the remap
-+ * idempotent and safe when one package name is a prefix of another
-+ * ("org.courville.nova" vs "org.courville.nova.debug").
-+ */
-+public final class PackagePathRemapper {
-+
-+    private static final Logger log = LoggerFactory.getLogger(PackagePathRemapper.class);
-+
-+    private static final String[] LEGACY_PACKAGES = {
-+            "org.courville.nova",
-+            "com.archos.mediacenter.videofree",
-+            "com.archos.mediacenter.video",
-+    };
-+
-+    /** Table name followed by its path columns. */
-+    private static final String[][] PATH_COLUMNS = {
-+            {"MOVIE", "cover_movie", "backdrop_movie"},
-+            {"SHOW", "cover_show", "backdrop_show"},
-+            {"EPISODE", "cover_episode", "picture_episode"},
-+            {"movie_posters", "m_po_thumb_file", "m_po_large_file"},
-+            {"movie_backdrops", "m_bd_thumb_file", "m_bd_large_file"},
-+            {"show_posters", "s_po_thumb_file", "s_po_large_file"},
-+            {"show_backdrops", "s_bd_thumb_file", "s_bd_large_file"},
-+            {"movie_collection", "m_coll_po_large_file", "m_coll_po_thumb_file", "m_coll_bd_large_file", "m_coll_bd_thumb_file"},
-+            {"videothumbnails", "_data"},
-+    };
-+
-+    private PackagePathRemapper() {
-+    }
-+
-+    public static void remap(SQLiteDatabase db, String currentPackage) {
-+        if (db == null || currentPackage == null || db.isReadOnly()) return;
-+        String newSegment = "/" + currentPackage + "/";
-+        for (String legacyPackage : LEGACY_PACKAGES) {
-+            if (legacyPackage.equals(currentPackage)) continue;
-+            String oldSegment = "/" + legacyPackage + "/";
-+            if (!containsSegment(db, oldSegment)) continue;
-+
-+            log.info("remap: rewriting paths from {} to {}", legacyPackage, currentPackage);
-+            db.beginTransaction();
-+            try {
-+                for (String[] table : PATH_COLUMNS) {
-+                    replaceInTable(db, table, oldSegment, newSegment);
-+                }
-+                db.setTransactionSuccessful();
-+            } finally {
-+                db.endTransaction();
-+            }
-+        }
-+    }
-+
-+    private static boolean containsSegment(SQLiteDatabase db, String segment) {
-+        String[] args = {"%" + segment + "%"};
-+        for (String[] table : PATH_COLUMNS) {
-+            for (int i = 1; i < table.length; i++) {
-+                try (Cursor c = db.rawQuery("SELECT 1 FROM " + table[0] + " WHERE " + table[i] + " LIKE ? LIMIT 1", args)) {
-+                    if (c.moveToFirst()) return true;
-+                } catch (SQLException e) {
-+                    // Table or column absent in this schema version
-+                }
-+            }
-+        }
-+        return false;
-+    }
-+
-+    private static void replaceInTable(SQLiteDatabase db, String[] table, String oldSegment, String newSegment) {
-+        StringBuilder set = new StringBuilder();
-+        StringBuilder where = new StringBuilder();
-+        List<Object> setArgs = new ArrayList<>();
-+        List<Object> whereArgs = new ArrayList<>();
-+        for (int i = 1; i < table.length; i++) {
-+            String column = table[i];
-+            if (i > 1) {
-+                set.append(", ");
-+                where.append(" OR ");
-+            }
-+            set.append(column).append(" = replace(").append(column).append(", ?, ?)");
-+            setArgs.add(oldSegment);
-+            setArgs.add(newSegment);
-+            where.append(column).append(" LIKE ?");
-+            whereArgs.add("%" + oldSegment + "%");
-+        }
-+        setArgs.addAll(whereArgs);
-+        try {
-+            db.execSQL("UPDATE " + table[0] + " SET " + set + " WHERE " + where, setArgs.toArray());
-+        } catch (SQLException e) {
-+            log.warn("remap: cannot update {}", table[0], e);
-+        }
-+    }
-+}
-diff --git a/src/com/archos/mediaprovider/video/VideoOpenHelper.java b/src/com/archos/mediaprovider/video/VideoOpenHelper.java
-index 0966a4ab..f235b8a6 100644
---- a/src/com/archos/mediaprovider/video/VideoOpenHelper.java
-+++ b/src/com/archos/mediaprovider/video/VideoOpenHelper.java
-@@ -1712,6 +1712,7 @@ public class VideoOpenHelper extends DeleteOnDowngradeSQLiteOpenHelper {
-         db.enableWriteAheadLogging();
-         // turn on foreign key support used in scraper tables
-         db.execSQL("PRAGMA foreign_keys = ON");
-+        if (mContext != null) PackagePathRemapper.remap(db, mContext.getPackageName());
-     }
- 
-     @Override
 diff --git a/src/com/archos/mediascraper/preprocess/ParseUtils.java b/src/com/archos/mediascraper/preprocess/ParseUtils.java
 index 4df26c1b..986eac11 100644
 --- a/src/com/archos/mediascraper/preprocess/ParseUtils.java
@@ -1417,10 +765,10 @@ index 4df26c1b..986eac11 100644
          if (log.isDebugEnabled()) log.debug("parenthesisYearExtractorTitleOnly input: {}", input);
 diff --git a/src/com/archos/mediascraper/preprocess/TransliterateUtils.java b/src/com/archos/mediascraper/preprocess/TransliterateUtils.java
 new file mode 100644
-index 00000000..0ddcaf28
+index 00000000..9326b908
 --- /dev/null
 +++ b/src/com/archos/mediascraper/preprocess/TransliterateUtils.java
-@@ -0,0 +1,206 @@
+@@ -0,0 +1,219 @@
 +// Copyright 2026 Courville Software
 +//
 +// Licensed under the Apache License, Version 2.0 (the "License");
@@ -1437,6 +785,8 @@ index 00000000..0ddcaf28
 +
 +package com.archos.mediascraper.preprocess;
 +
++import java.util.ArrayList;
++import java.util.List;
 +import java.util.Locale;
 +import java.util.regex.Matcher;
 +import java.util.regex.Pattern;
@@ -1450,9 +800,13 @@ index 00000000..0ddcaf28
 + *   <li>{@code y}/{@code j} before a vowel is iotation ("ya" -> "я", "Moya" -> "Моя");</li>
 + *   <li>{@code y} after a vowel is "й" ("Viy" -> "Вий"), otherwise "ы" ("Menty" -> "Менты");</li>
 + *   <li>{@code e} at the start of a word is "э" ("Ekipazh" -> "Экипаж");</li>
-+ *   <li>{@code c} before e/i/y is "ц", otherwise "к".</li>
++ *   <li>{@code c} before e/i/y is "ц", otherwise "к";</li>
++ *   <li>word-final "ia"/"ii" is "ия"/"ий" ("Maria" -> "Мария").</li>
 + * </ul>
-+ * The result is only a search candidate, so ambiguous cases favour the most frequent spelling.
++ * Only these general rules are applied: no word-specific exceptions and no guesses at
++ * misspellings. What the Latin spelling cannot tell apart ("ts" is "ц" or "тс", a soft sign
++ * inside a word is usually dropped) is left to the fuzzy TMDb search and to the scoring of the
++ * results, so the result is only a search candidate.
 + */
 +public final class TransliterateUtils {
 +
@@ -1478,6 +832,25 @@ index 00000000..0ddcaf28
 +     * Leaves numbers, punctuation and non-Latin characters untouched.
 +     */
 +    public static String transliterateToCyrillic(String input) {
++        return transliterate(input, false);
++    }
++
++    /**
++     * The transliteration of {@link #transliterateToCyrillic}, followed, when it differs, by the
++     * one with a soft sign before an iotated vowel following a consonant: release names drop it
++     * ("Druzja" is "Друзья", while "Kolya" is "Коля").
++     */
++    public static List<String> transliterateToCyrillicVariants(String input) {
++        List<String> variants = new ArrayList<>(2);
++        String plain = transliterate(input, false);
++        if (plain == null || plain.isEmpty()) return variants;
++        variants.add(plain);
++        String softSign = transliterate(input, true);
++        if (!softSign.equals(plain)) variants.add(softSign);
++        return variants;
++    }
++
++    private static String transliterate(String input, boolean softSign) {
 +        if (input == null || input.isEmpty()) {
 +            return input;
 +        }
@@ -1489,12 +862,12 @@ index 00000000..0ddcaf28
 +        Matcher matcher = WORD_OR_SEPARATOR.matcher(normalized);
 +        while (matcher.find()) {
 +            String word = matcher.group(1);
-+            result.append(word != null ? transliterateWord(word) : matcher.group(2));
++            result.append(word != null ? transliterateWord(word, softSign) : matcher.group(2));
 +        }
 +        return result.toString();
 +    }
 +
-+    private static String transliterateWord(String word) {
++    private static String transliterateWord(String word, boolean softSign) {
 +        boolean allUpper = isAllUpperCase(word);
 +        boolean firstUpper = Character.isUpperCase(word.charAt(0));
 +
@@ -1504,28 +877,10 @@ index 00000000..0ddcaf28
 +        int i = 0;
 +
 +        while (i < len) {
-+            if (lower.startsWith("shch", i)) {
++            // "shch" before "sch", both before the two-letter "sh"
++            if (lower.startsWith("shch", i) || lower.startsWith("sch", i)) {
 +                sb.append('щ');
-+                i += 4;
-+                continue;
-+            }
-+            if (lower.startsWith("lzya", i)) { // "nelzya" -> "нельзя" (soft sign is usually dropped)
-+                sb.append("льзя");
-+                i += 4;
-+                continue;
-+            }
-+
-+            String three = i + 3 <= len ? lower.substring(i, i + 3) : "";
-+            String threeMapped = switch (three) {
-+                case "sch" -> "щ";
-+                case "zsh" -> "ж";
-+                case "dzh" -> "дж";
-+                case "tsh" -> "ч";
-+                default -> null;
-+            };
-+            if (threeMapped != null) {
-+                sb.append(threeMapped);
-+                i += 3;
++                i += lower.startsWith("shch", i) ? 4 : 3;
 +                continue;
 +            }
 +
@@ -1535,6 +890,7 @@ index 00000000..0ddcaf28
 +
 +            // Iotated vowels: "ya", "ju", "yo", "ye"
 +            if ((c == 'y' || c == 'j') && isIotatable(next)) {
++                if (softSign && i > 0 && isConsonant(lower.charAt(i - 1))) sb.append('ь');
 +                sb.append(switch (next) {
 +                    case 'a' -> 'я';
 +                    case 'u' -> 'ю';
@@ -1550,7 +906,8 @@ index 00000000..0ddcaf28
 +                case 'k' -> next == 'h' ? "х" : null;
 +                case 'c' -> next == 'h' ? "ч" : null;
 +                case 's' -> next == 'h' ? "ш" : null;
-+                case 't' -> (next == 's' || next == 'c' || next == 'z') ? "ц" : null;
++                // "tsh" is "т" + the digraph "sh" ("Otshel'nik" -> "Отшельник")
++                case 't' -> next == 's' && (i + 2 >= len || lower.charAt(i + 2) != 'h') ? "ц" : null;
 +                // Word-final "ia"/"ii" as in "Maria", "Rossia", passport-style "Iurii"
 +                case 'i' -> atWordEnd && next == 'a' ? "ия" : atWordEnd && next == 'i' ? "ий" : null;
 +                default -> null;
@@ -1600,6 +957,10 @@ index 00000000..0ddcaf28
 +        return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u' || c == 'y';
 +    }
 +
++    private static boolean isConsonant(char c) {
++        return c >= 'a' && c <= 'z' && !isVowel(c);
++    }
++
 +    private static boolean isIotatable(char c) {
 +        return c == 'a' || c == 'u' || c == 'o' || c == 'e';
 +    }
@@ -1628,10 +989,18 @@ index 00000000..0ddcaf28
 +    }
 +}
 diff --git a/src/com/archos/mediascraper/themoviedb3/SearchShow.java b/src/com/archos/mediascraper/themoviedb3/SearchShow.java
-index 7205777a..56b273be 100644
+index 7205777a..ba3dabb6 100644
 --- a/src/com/archos/mediascraper/themoviedb3/SearchShow.java
 +++ b/src/com/archos/mediascraper/themoviedb3/SearchShow.java
-@@ -109,7 +109,7 @@ public class SearchShow {
+@@ -21,6 +21,7 @@ import com.archos.mediascraper.SearchResult;
+ import com.archos.mediascraper.ShowUtils;
+ import com.archos.mediascraper.preprocess.TvShowSearchInfo;
+ import com.archos.mediascraper.xml.ShowScraper4;
++import com.uwetrottmann.tmdb2.entities.BaseTvShow;
+ import com.uwetrottmann.tmdb2.entities.TvShowResultsPage;
+ 
+ import org.slf4j.Logger;
+@@ -109,7 +110,7 @@ public class SearchShow {
                      if (response.body() == null || response.body().total_results == 0) {
                          // Fallback for transliterated titles (e.g. German umlauts: 'ae' -> 'ä')
                          boolean isGerman = (language != null && language.startsWith("de")) ||
@@ -1640,13 +1009,17 @@ index 7205777a..56b273be 100644
                          if (isGerman) {
                              String transliterated = com.archos.mediascraper.preprocess.ParseUtils.transliterate(searchQueryString);
                              if (!transliterated.equals(searchQueryString)) {
-@@ -122,6 +122,18 @@ public class SearchShow {
+@@ -122,6 +123,30 @@ public class SearchShow {
                                      if (response.isSuccessful()) isResponseOk = true;
                                  }
                              }
 +                        } else if (com.archos.mediascraper.preprocess.TransliterateUtils.isRussianLanguage(language)) {
-+                            String transliterated = com.archos.mediascraper.preprocess.TransliterateUtils.transliterateToCyrillic(searchQueryString);
-+                            if (!transliterated.equals(searchQueryString)) {
++                            // TMDb search is fuzzy: a spelling variant finding only other shows
++                            // ("Друзя" -> "Задорные друзья") gives way to one naming the show
++                            // exactly ("Друзья")
++                            Response<TvShowResultsPage> firstFound = null;
++                            for (String transliterated : com.archos.mediascraper.preprocess.TransliterateUtils.transliterateToCyrillicVariants(searchQueryString)) {
++                                if (transliterated.equals(searchQueryString)) continue;
 +                                if (log.isDebugEnabled()) log.debug("search: no results, retrying with Russian transliterated name: {}", transliterated);
 +                                response = tmdb.searchService().tv(transliterated, 1, language, year, false).execute();
 +                                if (response.isSuccessful()) isResponseOk = true;
@@ -1655,12 +1028,35 @@ index 7205777a..56b273be 100644
 +                                    response = tmdb.searchService().tv(transliterated, 1, "en", year, false).execute();
 +                                    if (response.isSuccessful()) isResponseOk = true;
 +                                }
++                                if (hasExactName(response, transliterated)) {
++                                    firstFound = null;
++                                    break;
++                                }
++                                if (firstFound == null && response.body() != null && response.body().total_results > 0) {
++                                    firstFound = response;
++                                }
 +                            }
++                            if (firstFound != null) response = firstFound;
                          }
                      }
                      if (response.body() == null || response.body().total_results == 0) notFoundIssue = true;
+@@ -177,6 +202,14 @@ public class SearchShow {
+         return myResult;
+     }
+ 
++    private static boolean hasExactName(Response<TvShowResultsPage> response, String name) {
++        if (response.body() == null || response.body().results == null) return false;
++        for (BaseTvShow show : response.body().results) {
++            if (name.equalsIgnoreCase(show.name) || name.equalsIgnoreCase(show.original_name)) return true;
++        }
++        return false;
++    }
++
+     public static void debugLruCache(LruCache<String, Response<TvShowResultsPage>> lruCache) {
+         if (log.isDebugEnabled()) log.debug("debugLruCache(Tier2): size={}, put={}, hit={}, miss={}, evict={}", lruCache.size(), lruCache.putCount(), lruCache.hitCount(), lruCache.missCount(), lruCache.evictionCount());
+     }
 diff --git a/src/com/archos/mediascraper/xml/MovieScraper3.java b/src/com/archos/mediascraper/xml/MovieScraper3.java
-index 58c6db2b..3d02e151 100644
+index 58c6db2b..26391a0e 100644
 --- a/src/com/archos/mediascraper/xml/MovieScraper3.java
 +++ b/src/com/archos/mediascraper/xml/MovieScraper3.java
 @@ -180,7 +180,7 @@ public class MovieScraper3 extends BaseScraper2 {
@@ -1672,7 +1068,7 @@ index 58c6db2b..3d02e151 100644
              if (isGerman) {
                  String transliterated = com.archos.mediascraper.preprocess.ParseUtils.transliterate(searchInfo.getName());
                  if (!transliterated.equals(searchInfo.getName())) {
-@@ -189,7 +189,32 @@ public class MovieScraper3 extends BaseScraper2 {
+@@ -189,7 +189,38 @@ public class MovieScraper3 extends BaseScraper2 {
              }
          }
  
@@ -1689,10 +1085,13 @@ index 58c6db2b..3d02e151 100644
 +        // Last resort for Russian titles written in Latin letters (e.g. 'Kholop' -> 'Холоп'). Any
 +        // Latin title can be transliterated, so these candidates are only queried when nothing
 +        // else matched: otherwise every English title would cost extra TMDb requests.
-+        final int firstLastResortCandidate = candidates.size();
-+        if (com.archos.mediascraper.preprocess.TransliterateUtils.isRussianLanguage(language)) {
-+            String transliterated = com.archos.mediascraper.preprocess.TransliterateUtils.transliterateToCyrillic(searchInfo.getName());
-+            if (transliterated != null && !transliterated.equals(searchInfo.getName())) {
++        final int firstTransliteratedCandidate = candidates.size();
++        List<String> cyrillicVariants = com.archos.mediascraper.preprocess.TransliterateUtils.isRussianLanguage(language)
++                ? com.archos.mediascraper.preprocess.TransliterateUtils.transliterateToCyrillicVariants(searchInfo.getName())
++                : Collections.emptyList();
++        if (!cyrillicVariants.isEmpty()) {
++            for (String transliterated : cyrillicVariants) {
++                if (transliterated.equals(searchInfo.getName())) continue;
 +                candidates.add(new SearchCandidate(transliterated, searchInfo.getYear()));
 +                if (searchInfo.getYear() != null) {
 +                    candidates.add(new SearchCandidate(transliterated, null));
@@ -1701,12 +1100,15 @@ index 58c6db2b..3d02e151 100644
 +        }
 +
 +        for (int candidateIndex = 0; candidateIndex < candidates.size(); candidateIndex++) {
-+            if (candidateIndex >= firstLastResortCandidate && !allResults.isEmpty()) break;
++            // Transliterations are skipped when the regular candidates found anything, and each
++            // next spelling variant is tried only while none found its title exactly
++            if (candidateIndex == firstTransliteratedCandidate && !allResults.isEmpty()) break;
++            if (candidateIndex > firstTransliteratedCandidate && hasExactTitleMatch(allResults, cyrillicVariants)) break;
 +            SearchCandidate candidate = candidates.get(candidateIndex);
              String searchQuery = candidate.query;
              String yearToUse = candidate.year;
  
-@@ -252,7 +277,7 @@ public class MovieScraper3 extends BaseScraper2 {
+@@ -252,7 +283,7 @@ public class MovieScraper3 extends BaseScraper2 {
  
              // If we found results and we're NOT doing unified scoring, we can stop early
              if (!allResults.isEmpty() && !useUnifiedScoring) {
@@ -1715,54 +1117,114 @@ index 58c6db2b..3d02e151 100644
                      if (log.isDebugEnabled()) log.debug("getMatches2: found results for '{}', stopping early", searchQuery);
                      break;
                  }
-@@ -352,6 +377,13 @@ public class MovieScraper3 extends BaseScraper2 {
+@@ -352,6 +383,23 @@ public class MovieScraper3 extends BaseScraper2 {
          org.apache.commons.text.similarity.LevenshteinDistance levenshteinDistance = org.apache.commons.text.similarity.LevenshteinDistance.getDefaultInstance();
          String referenceNameLC = referenceName.toLowerCase();
          String cleanedNameLC = cleanedName.toLowerCase();
-+        String cyrillicRefLC = com.archos.mediascraper.preprocess.TransliterateUtils.isRussianLanguage(language) ?
-+                com.archos.mediascraper.preprocess.TransliterateUtils.transliterateToCyrillic(referenceNameLC) : null;
-+        List<String> bilingualPartsRef = com.archos.mediascraper.preprocess.ParseUtils.splitBilingualTitle(referenceName);
-+        List<String> bilingualPartsRefLC = new ArrayList<>(bilingualPartsRef.size());
-+        for (String p : bilingualPartsRef) {
-+            bilingualPartsRefLC.add(p.toLowerCase());
++        // Every spelling of the searched title: the file name, its Cyrillic transliterations and,
++        // for a bilingual name, each language half. A result is as close as its best spelling.
++        List<String> cyrillicVariantsLC = new ArrayList<>(cyrillicVariants.size());
++        for (String variant : cyrillicVariants) {
++            cyrillicVariantsLC.add(variant.toLowerCase());
 +        }
++        List<String> referencesLC = new ArrayList<>();
++        referencesLC.add(referenceNameLC);
++        referencesLC.addAll(cyrillicVariantsLC);
++        for (String part : com.archos.mediascraper.preprocess.ParseUtils.splitBilingualTitle(referenceName)) {
++            referencesLC.add(part.toLowerCase());
++        }
++        // A Russian title written in Latin letters names a Russian original: among equally close
++        // results, the one whose original title is the transliteration wins over a foreign film
++        // only released under that title ("Svobodnoe padenie" is the Russian "Свободное падение",
++        // not "Freefall"). Without a transliteration every result gets the same value here.
++        java.util.Map<Integer, Integer> transliteratedOriginalDistances = new java.util.HashMap<>();
  
          // Expected release year parsed from the filename, if any: used below to penalize
          // candidates whose actual TMDb release year clearly does not match, so that a title that
-@@ -381,13 +413,32 @@ public class MovieScraper3 extends BaseScraper2 {
+@@ -380,15 +428,20 @@ public class MovieScraper3 extends BaseScraper2 {
+             String titleLC = title != null ? title.toLowerCase() : "";
              String originalTitleLC = originalTitle != null ? originalTitle.toLowerCase() : "";
  
-             int distance;
-+            boolean exactBilingual = false;
-+            for (String partLC : bilingualPartsRefLC) {
-+                if (titleLC.equals(partLC) || originalTitleLC.equals(partLC)) {
-+                    exactBilingual = true;
-+                    break;
-+                }
-+            }
-             // BOOST: Exact match for cleaned name gets priority (distance 0)
+-            int distance;
+-            // BOOST: Exact match for cleaned name gets priority (distance 0)
 -            if (titleLC.equals(cleanedNameLC) || originalTitleLC.equals(cleanedNameLC)) {
-+            if (titleLC.equals(cleanedNameLC) || originalTitleLC.equals(cleanedNameLC) ||
-+                (cyrillicRefLC != null && (titleLC.equals(cyrillicRefLC) || originalTitleLC.equals(cyrillicRefLC))) ||
-+                exactBilingual) {
-                 distance = 0;
-             } else {
-                 int distTitle = title != null ? levenshteinDistance.apply(referenceNameLC, titleLC) : Integer.MAX_VALUE;
-                 int distOrig = originalTitle != null ? levenshteinDistance.apply(referenceNameLC, originalTitleLC) : Integer.MAX_VALUE;
-                 distance = Math.min(distTitle, distOrig);
-+                if (cyrillicRefLC != null) {
-+                    int distTitleCyr = title != null ? levenshteinDistance.apply(cyrillicRefLC, titleLC) : Integer.MAX_VALUE;
-+                    int distOrigCyr = originalTitle != null ? levenshteinDistance.apply(cyrillicRefLC, originalTitleLC) : Integer.MAX_VALUE;
-+                    distance = Math.min(distance, Math.min(distTitleCyr, distOrigCyr));
-+                }
-+                for (String partLC : bilingualPartsRefLC) {
-+                    int distTitlePart = title != null ? levenshteinDistance.apply(partLC, titleLC) : Integer.MAX_VALUE;
-+                    int distOrigPart = originalTitle != null ? levenshteinDistance.apply(partLC, originalTitleLC) : Integer.MAX_VALUE;
-+                    distance = Math.min(distance, Math.min(distTitlePart, distOrigPart));
+-                distance = 0;
+-            } else {
+-                int distTitle = title != null ? levenshteinDistance.apply(referenceNameLC, titleLC) : Integer.MAX_VALUE;
+-                int distOrig = originalTitle != null ? levenshteinDistance.apply(referenceNameLC, originalTitleLC) : Integer.MAX_VALUE;
+-                distance = Math.min(distTitle, distOrig);
++            int distTitle = Integer.MAX_VALUE;
++            int distOrig = Integer.MAX_VALUE;
++            for (String referenceLC : referencesLC) {
++                if (title != null) distTitle = Math.min(distTitle, levenshteinDistance.apply(referenceLC, titleLC));
++                if (originalTitle != null) distOrig = Math.min(distOrig, levenshteinDistance.apply(referenceLC, originalTitleLC));
++            }
++            int distance = Math.min(distTitle, distOrig);
++            int distOrigTransliterated = Integer.MAX_VALUE;
++            if (originalTitle != null) {
++                for (String variantLC : cyrillicVariantsLC) {
++                    distOrigTransliterated = Math.min(distOrigTransliterated, levenshteinDistance.apply(variantLC, originalTitleLC));
 +                }
              }
++            transliteratedOriginalDistances.put(sr.getId(), distOrigTransliterated);
  
              // PENALTY: an exact (or near) title match is not a genuine match if its actual TMDb
+             // release year is clearly different from the year parsed out of the filename. Without
+@@ -440,7 +493,25 @@ public class MovieScraper3 extends BaseScraper2 {
+         }
+ 
+         List<SearchResult> sortedResults = new ArrayList<>(uniqueResults.values());
+-        Collections.sort(sortedResults, com.archos.mediascraper.themoviedb3.SearchParserResult.comparator);
++        java.util.Comparator<SearchResult> order = java.util.Comparator.comparingInt(SearchResult::getLevenshteinDistance);
++        // Among equally close titles, the release year nearest to the file's one wins, even when
++        // that year is not "confident" ("Svobodnoe padenie.2023" is the 2025 film, not the 1988
++        // one). A year at the start of the name may be part of the title and is not used.
++        Integer fileYear = null;
++        if (searchInfo.getYear() != null && !searchInfo.isYearAtStart()) {
++            try {
++                fileYear = Integer.valueOf(searchInfo.getYear());
++            } catch (NumberFormatException nfe) {
++                fileYear = null;
++            }
++        }
++        if (fileYear != null) {
++            final int year = fileYear;
++            order = order.thenComparingInt(sr -> yearGap(sr, year));
++        }
++        order = order.thenComparingInt(sr -> transliteratedOriginalDistances.getOrDefault(sr.getId(), Integer.MAX_VALUE))
++                .thenComparing(com.archos.mediascraper.themoviedb3.SearchParserResult.comparator);
++        Collections.sort(sortedResults, order);
+ 
+         //Return the rest we got.
+         return new ScrapeSearchResult(sortedResults, true, ScrapeStatus.OKAY, null);
+@@ -462,6 +533,13 @@ public class MovieScraper3 extends BaseScraper2 {
+         return levenshteinDistance.apply(queryLC, head);
+     }
+ 
++    private static int yearGap(SearchResult sr, int year) {
++        if (sr.getReleaseOrFirstAiredDate() == null) return Integer.MAX_VALUE;
++        Calendar releaseCal = Calendar.getInstance();
++        releaseCal.setTime(sr.getReleaseOrFirstAiredDate());
++        return Math.abs(releaseCal.get(Calendar.YEAR) - year);
++    }
++
+     private String getTitleHead(String name) {
+         if (name == null) return null;
+         // Split by colon, comma, or " - " (dash surrounded by spaces)
+@@ -484,6 +562,13 @@ public class MovieScraper3 extends BaseScraper2 {
+         return Normalizer.normalize(name, Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
+     }
+ 
++    private boolean hasExactTitleMatch(List<SearchResult> results, List<String> queries) {
++        for (String query : queries) {
++            if (hasExactTitleMatch(results, query)) return true;
++        }
++        return false;
++    }
++
+     private boolean hasExactTitleMatch(List<SearchResult> results, String query) {
+         if (results == null || query == null) return false;
+         String normalizedQuery = normalizeTitleForExactMatch(query);
 diff --git a/src/com/archos/mediascraper/xml/ShowScraper4.java b/src/com/archos/mediascraper/xml/ShowScraper4.java
 index afee9ce2..3cf536ed 100644
 --- a/src/com/archos/mediascraper/xml/ShowScraper4.java
@@ -1914,10 +1376,10 @@ index 00000000..bf4ccf81
 +}
 diff --git a/test/java/com/archos/mediacenter/utils/videodb/StreamTitleResolverTest.java b/test/java/com/archos/mediacenter/utils/videodb/StreamTitleResolverTest.java
 new file mode 100644
-index 00000000..370019bb
+index 00000000..9419ae0e
 --- /dev/null
 +++ b/test/java/com/archos/mediacenter/utils/videodb/StreamTitleResolverTest.java
-@@ -0,0 +1,191 @@
+@@ -0,0 +1,92 @@
 +// Copyright 2026 Archos SA / Nova Video Player Project
 +//
 +// Licensed under the Apache License, Version 2.0 (the "License");
@@ -1950,171 +1412,72 @@ index 00000000..370019bb
 +@Config(sdk = 33)
 +public class StreamTitleResolverTest {
 +
-+    @Test
-+    public void testIsTorrentTopicTitle() {
-+        assertTrue(StreamTitleResolver.isTorrentTopicTitle("Во все тяжкие / Breaking Bad / Сезон: 1 / Серии: 1-7 из 7 [2008, WEB-DL 1080p]"));
-+        assertTrue(StreamTitleResolver.isTorrentTopicTitle("Слово пацана. Кровь на асфальте [01-08 из 08] (2023) WEB-DL 1080p"));
-+        assertTrue(StreamTitleResolver.isTorrentTopicTitle("Рик и Морти (Сезон 7, серии 1-10) [1080p]"));
-+        assertTrue(StreamTitleResolver.isTorrentTopicTitle("Breaking Bad (Season 1) [BDRip]"));
++    private static final String TOPIC = "[NUM] Звездный путь: Странные новые миры (4 сезон: 1-10 серия из 10)"
++            + " / Star Trek: Strange New Worlds / 2026 / ПМ (NewComers), СТ / WEB-DL (1080p) | NewComers";
 +
-+        assertFalse(StreamTitleResolver.isTorrentTopicTitle("Breaking Bad - S01E03 - Pilot"));
-+        assertFalse(StreamTitleResolver.isTorrentTopicTitle("Inception (2010)"));
-+        assertFalse(StreamTitleResolver.isTorrentTopicTitle(null));
++    @Test
++    public void sourceTitleIsShownAsIsWithTheEpisodeNumber() {
++        Uri uri = Uri.parse("http://127.0.0.1:8090/stream/Star.Trek.Strange.New.Worlds.S04E07.1080p.WEB-DL.NewComers.mkv?link=aa73&index=7&play");
++        StreamTitleResolver.Result res = StreamTitleResolver.resolve(uri, TOPIC);
++        assertTrue(res.isTvShow);
++        assertEquals(4, res.season);
++        assertEquals(7, res.episode);
++        String shown = TOPIC.substring("[NUM] ".length()); // leading tags are dropped
++        assertEquals(shown, res.showName);
++        assertEquals(shown + "  -  S04E07", res.title);
 +    }
 +
 +    @Test
-+    public void testCleanShowNameFromTorrentTitle() {
-+        assertEquals("Во все тяжкие / Breaking Bad", StreamTitleResolver.cleanShowNameFromTorrentTitle(
-+                "Во все тяжкие / Breaking Bad / Сезон: 1 / Серии: 1-7 из 7 [2008, США, BDRip 720p] MVO"));
-+        assertEquals("Слово пацана. Кровь на асфальте", StreamTitleResolver.cleanShowNameFromTorrentTitle(
-+                "Слово пацана. Кровь на асфальте [01-08 из 08] (2023) WEB-DL 1080p"));
-+        assertEquals("Дом Дракона / House of the Dragon", StreamTitleResolver.cleanShowNameFromTorrentTitle(
-+                "Дом Дракона / House of the Dragon (2 сезон: 1-8 серии из 8) [2024, 2160p 4K]"));
++    public void onlyLeadingTagsAreDropped() {
++        Uri uri = Uri.parse("http://127.0.0.1:8090/stream/Movie.mkv?link=ab&index=1&play");
++        assertEquals("Начало / Inception [2010, BDRip]",
++                StreamTitleResolver.resolve(uri, "[NUM] [HD] Начало / Inception [2010, BDRip]").title);
++        // A title made only of a tag falls back to the file name
++        assertEquals("Movie", StreamTitleResolver.resolve(uri, "[NUM]").title);
 +    }
 +
 +    @Test
-+    public void testCleanShowNameKeepsTitlesThatLookLikeReleaseWords() {
-+        assertEquals("Submarine / Субмарина", StreamTitleResolver.cleanShowNameFromTorrentTitle("Submarine / Субмарина [2010, BDRip]"));
-+        assertEquals("Dublin Murders", StreamTitleResolver.cleanShowNameFromTorrentTitle("Dublin Murders / Сезон: 1 [2019, WEB-DL]"));
-+        assertEquals("Original Sin", StreamTitleResolver.cleanShowNameFromTorrentTitle("Original Sin [2001, DVDRip]"));
-+        assertEquals("Episodes", StreamTitleResolver.cleanShowNameFromTorrentTitle("Episodes / Сезон: 1 / Серии: 1-7 из 7 [2011, WEB-DL]"));
++    public void episodeNumberIsNotRepeated() {
++        Uri uri = Uri.parse("http://127.0.0.1:8090/stream/Show.S01E02.mkv?link=ab&index=2&play");
++        assertEquals("Show - S01E02 - Pilot", StreamTitleResolver.resolve(uri, "Show - S01E02 - Pilot").title);
++        assertEquals("Show - s01e02", StreamTitleResolver.resolve(uri, "Show - s01e02").title);
 +    }
 +
 +    @Test
-+    public void testExtractYear() {
-+        assertEquals("2010", StreamTitleResolver.extractYear("Начало / Inception (Кристофер Нолан) [2010, BDRip 1080p]"));
-+        assertEquals("2017", StreamTitleResolver.extractYear("Blade Runner 2049 (2017)"));
-+        assertNull(StreamTitleResolver.extractYear("Blade Runner 2049"));
++    public void movieOrUnknownFileKeepsTheSourceTitle() {
++        Uri uri = Uri.parse("http://127.0.0.1:8090/stream/Inception.2010.1080p.mkv?link=ab&index=1&play");
++        StreamTitleResolver.Result res = StreamTitleResolver.resolve(uri, "Начало / Inception [2010, BDRip]");
++        assertFalse(res.isTvShow);
++        assertEquals("Начало / Inception [2010, BDRip]", res.title);
 +    }
 +
 +    @Test
-+    public void testStripVideoExtensionKeepsHumanTitles() {
-+        assertEquals("Mr. Robot", StreamTitleResolver.stripVideoExtension("Mr. Robot"));
-+        assertEquals("Show.S01E02", StreamTitleResolver.stripVideoExtension("Show.S01E02.mkv"));
-+        assertEquals("Movie", StreamTitleResolver.stripVideoExtension("Movie.MP4"));
++    public void withoutSourceTitleTheFileNameIsUsed() {
++        Uri uri = Uri.parse("http://127.0.0.1:8090/stream/Breaking.Bad.S01E03.720p.mkv?link=ab&index=3&play");
++        assertEquals("Breaking.Bad.S01E03.720p", StreamTitleResolver.resolve(uri, null).title);
++        assertEquals("Video", StreamTitleResolver.resolve(Uri.parse("http://host/stream?link=ab&index=0"), " ").title);
 +    }
 +
 +    @Test
-+    public void testExtractFileName() {
++    public void extractFileName() {
 +        assertEquals("Breaking.Bad.s01e03.720p", StreamTitleResolver.extractFileName(
-+                Uri.parse("http://127.0.0.1:8090/stream/Breaking.Bad.s01e03.720p.mkv?link=abcdef&index=2&play")));
-+        assertEquals("02 - Cat's in the Bag", StreamTitleResolver.extractFileName(
-+                Uri.parse("http://127.0.0.1:8090/stream/Season%201%2F02%20-%20Cat's%20in%20the%20Bag.mkv?link=abcdef&index=1&play")));
++                Uri.parse("http://127.0.0.1:8090/stream/Breaking.Bad.s01e03.720p.mkv?link=45b6&index=2&play")));
 +        assertEquals("Серия 04", StreamTitleResolver.extractFileName(
-+                Uri.parse("http://127.0.0.1:8090/stream/%D0%A1%D0%B5%D1%80%D0%B8%D1%8F%2004.mkv?link=abcdef&index=3&play")));
++                Uri.parse("http://127.0.0.1:8090/stream/%D0%A1%D0%B5%D1%80%D0%B8%D1%8F%2004.mkv?link=a")));
++        assertEquals("Episode", StreamTitleResolver.extractFileName(
++                Uri.parse("http://host/stream/Season%201%2FEpisode.mkv?link=a")));
 +        assertEquals("Show.S02E05", StreamTitleResolver.extractFileName(
 +                Uri.parse("http://127.0.0.1:8090/stream?link=abcdef&index=0&play&title=Show.S02E05.mkv")));
-+    }
-+
-+    @Test
-+    public void testTorrServeSingleEpisodeResolutionWithTopicTitle() {
-+        Uri uri = Uri.parse("http://127.0.0.1:8090/stream/Breaking.Bad.s01e03.720p.mkv?link=45b6&index=2&play");
-+        String topic = "Во все тяжкие / Breaking Bad / Сезон: 1 / Серии: 1-7 из 7 (Винс Гиллиган) [2008, США, BDRip 720p]";
-+
-+        StreamTitleResolver.Result res = StreamTitleResolver.resolve(uri, topic);
-+        assertTrue(res.isTvShow);
-+        assertEquals(1, res.season);
-+        assertEquals(3, res.episode);
-+        assertEquals("Во все тяжкие / Breaking Bad", res.showName);
-+        assertEquals("Во все тяжкие / Breaking Bad  -  S01E03", res.title);
-+    }
-+
-+    @Test
-+    public void testTorrServeEpisodeWithEpisodeTitleInFileName() {
-+        Uri uri = Uri.parse("http://127.0.0.1:8090/stream/Season%201%2FBreaking.Bad.S01E02.Cat's.in.the.Bag.mkv?link=45b6&index=1&play");
-+
-+        StreamTitleResolver.Result res = StreamTitleResolver.resolve(uri, "Во все тяжкие (1 сезон) [2008, WEB-DL]");
-+        assertTrue(res.isTvShow);
-+        assertEquals(1, res.season);
-+        assertEquals(2, res.episode);
-+        assertEquals("Cat's in the Bag", res.episodeTitle);
-+        assertEquals("Во все тяжкие", res.showName);
-+        assertEquals("Во все тяжкие  -  S01E02  -  Cat's in the Bag", res.title);
-+    }
-+
-+    @Test
-+    public void testTorrServeEpisodeWithNumericFilename() {
-+        Uri uri = Uri.parse("http://127.0.0.1:8090/stream/Season%201%2F04%20-%20Cancer%20Man.mkv?link=45b6&index=3&play");
-+
-+        StreamTitleResolver.Result res = StreamTitleResolver.resolve(uri, "Во все тяжкие (Сезон 1) [2008]");
-+        assertTrue(res.isTvShow);
-+        assertEquals(1, res.season);
-+        assertEquals(4, res.episode);
-+        assertEquals("Cancer Man", res.episodeTitle);
-+        assertEquals("Во все тяжкие", res.showName);
-+        assertEquals("Во все тяжкие  -  S01E04  -  Cancer Man", res.title);
-+    }
-+
-+    @Test
-+    public void testMovieResolution() {
-+        Uri uri = Uri.parse("http://127.0.0.1:8090/stream/Inception.2010.1080p.mkv?link=abc&index=0&play");
-+
-+        StreamTitleResolver.Result res = StreamTitleResolver.resolve(uri, "Начало / Inception (Кристофер Нолан) [2010, BDRip 1080p]");
-+        assertFalse(res.isTvShow);
-+        assertEquals("Начало / Inception", res.title);
-+        assertEquals("2010", res.year);
-+    }
-+
-+    @Test
-+    public void testMoviesStartingWithNumbersAreNotEpisodes() {
-+        for (String file : new String[]{"21.Jump.Street.2012.1080p", "300.Rise.of.an.Empire.2014", "12.Angry.Men.1957"}) {
-+            StreamTitleResolver.Result res = StreamTitleResolver.resolve(Uri.parse("http://host/stream/" + file + ".mkv?link=abc&index=0"), null);
-+            assertFalse(file, res.isTvShow);
-+        }
-+    }
-+
-+    @Test
-+    public void testTitlesWithDotsAreNotTruncated() {
-+        StreamTitleResolver.Result movie = StreamTitleResolver.resolve(Uri.parse("http://host/play"), "Mr. & Mrs. Smith");
-+        assertEquals("Mr. & Mrs. Smith", movie.title);
-+
-+        StreamTitleResolver.Result show = StreamTitleResolver.resolve(
-+                Uri.parse("http://host/stream/Slovo.patsana.S01E02.mkv?link=abc&index=1"),
-+                "Слово пацана. Кровь на асфальте [01-08 из 08] (2023) WEB-DL 1080p");
-+        assertEquals("Слово пацана. Кровь на асфальте  -  S01E02", show.title);
-+    }
-+
-+    @Test
-+    public void testNoDuplicateSxxExxWhenIntentTitleAlreadyContainsEpisode() {
-+        Uri uri = Uri.parse("http://127.0.0.1:8090/stream/Stranger.Things.S04E10.1080p.mkv?link=abc&index=9&play");
-+
-+        StreamTitleResolver.Result res = StreamTitleResolver.resolve(uri, "Stranger Things S4E10");
-+        assertEquals(4, res.season);
-+        assertEquals(10, res.episode);
-+        assertEquals("Stranger Things", res.showName);
-+        assertEquals("Stranger Things  -  S04E10", res.title);
-+
-+        StreamTitleResolver.Result res2 = StreamTitleResolver.resolve(uri, "Очень странные дела / Stranger Things S4E10");
-+        assertEquals("Очень странные дела / Stranger Things", res2.showName);
-+        assertEquals("Очень странные дела / Stranger Things  -  S04E10", res2.title);
-+
-+        StreamTitleResolver.Result res3 = StreamTitleResolver.resolve(uri, "Stranger Things  -  S04E10");
-+        assertEquals("Stranger Things", res3.showName);
-+        assertEquals("Stranger Things  -  S04E10", res3.title);
-+    }
-+
-+    @Test
-+    public void testBuildScraperFileName() {
-+        Uri episode = Uri.parse("http://127.0.0.1:8090/stream/Breaking.Bad.s01e03.720p.mkv?link=45b6&index=2&play");
-+        assertEquals("Во все тяжкие   Breaking Bad S01E03.mkv", StreamTitleResolver.buildScraperFileName(episode,
-+                "Во все тяжкие / Breaking Bad / Сезон: 1 / Серии: 1-7 из 7 [2008, BDRip 720p]"));
-+
-+        Uri movie = Uri.parse("http://127.0.0.1:8090/stream/Inception.2010.1080p.mkv?link=abc&index=0&play");
-+        assertEquals("Начало   Inception (2010).mkv", StreamTitleResolver.buildScraperFileName(movie,
-+                "Начало / Inception (Кристофер Нолан) [2010, BDRip 1080p]"));
-+
-+        // Without an explicit title the real file must be scraped (NFO, folder names)
-+        assertNull(StreamTitleResolver.buildScraperFileName(episode, null));
-+        // An episode without a known show name cannot be scraped reliably from a title
-+        assertNull(StreamTitleResolver.buildScraperFileName(Uri.parse("file:///storage/Season 1/04 - Cancer Man.mkv"), "Сезон 1"));
++        assertEquals("Mr. Robot", StreamTitleResolver.extractFileName(Uri.parse("http://host/Mr.%20Robot")));
++        assertNull(StreamTitleResolver.extractFileName(Uri.parse("http://host/stream?link=abcdef")));
 +    }
 +}
 diff --git a/test/java/com/archos/mediascraper/preprocess/TransliterateUtilsTest.java b/test/java/com/archos/mediascraper/preprocess/TransliterateUtilsTest.java
 new file mode 100644
-index 00000000..653338ce
+index 00000000..0f8d575c
 --- /dev/null
 +++ b/test/java/com/archos/mediascraper/preprocess/TransliterateUtilsTest.java
-@@ -0,0 +1,182 @@
+@@ -0,0 +1,204 @@
 +// Copyright 2026 Courville Software
 +//
 +// Licensed under the Apache License, Version 2.0 (the "License");
@@ -2149,6 +1512,17 @@ index 00000000..653338ce
 +        assertTrue(TransliterateUtils.isRussianLanguage("RU"));
 +        assertFalse(TransliterateUtils.isRussianLanguage("en"));
 +        assertFalse(TransliterateUtils.isRussianLanguage("de"));
++    }
++
++    @Test
++    public void testSoftSignVariant() {
++        assertEquals(java.util.Arrays.asList("Друзя", "Друзья"),
++                TransliterateUtils.transliterateToCyrillicVariants("Druzja"));
++        assertEquals(java.util.Arrays.asList("Коля", "Колья"),
++                TransliterateUtils.transliterateToCyrillicVariants("Kolya"));
++        // No consonant before the iotated vowel: a single variant
++        assertEquals(java.util.Arrays.asList("Моя"), TransliterateUtils.transliterateToCyrillicVariants("Moya"));
++        assertEquals(java.util.Arrays.asList("Холоп"), TransliterateUtils.transliterateToCyrillicVariants("Kholop"));
 +    }
 +
 +    @Test
@@ -2190,9 +1564,10 @@ index 00000000..653338ce
 +        // "Shchuka" -> "Щука"
 +        assertEquals("Щука", TransliterateUtils.transliterateToCyrillic("Shchuka"));
 +
-+        // "Mesto vstrechi izmenit' nelzya"
-+        assertEquals("Место встречи изменить нельзя", TransliterateUtils.transliterateToCyrillic("Mesto vstrechi izmenit' nelzya"));
-+        assertEquals("Место встречи изменит нельзя", TransliterateUtils.transliterateToCyrillic("Mesto vstrechi izmenit nelzya"));
++        // An apostrophe is a soft sign; a dropped soft sign is not guessed back ("nelzya" is not
++        // special-cased): the fuzzy search and scoring take care of the one-letter difference
++        assertEquals("Место встречи изменить нелзя", TransliterateUtils.transliterateToCyrillic("Mesto vstrechi izmenit' nelzya"));
++        assertEquals("Место встречи изменит нелзя", TransliterateUtils.transliterateToCyrillic("Mesto vstrechi izmenit nelzya"));
 +
 +        // More test cases
 +        assertEquals("Карпов", TransliterateUtils.transliterateToCyrillic("Karpov"));
@@ -2219,6 +1594,16 @@ index 00000000..653338ce
 +        // Word-final "ia" is "ия", elsewhere "иа"
 +        assertEquals("Мария", TransliterateUtils.transliterateToCyrillic("Maria"));
 +        assertEquals("Диана", TransliterateUtils.transliterateToCyrillic("Diana"));
++        // Only "ts" is "ц": "t" followed by "c", "ch", "sh" or "z" keeps its own letter
++        assertEquals("Отчаяние", TransliterateUtils.transliterateToCyrillic("Otchayanie"));
++        assertEquals("Отцы", TransliterateUtils.transliterateToCyrillic("Ottsy"));
++        assertEquals("Отшельник", TransliterateUtils.transliterateToCyrillic("Otshel'nik"));
++        assertEquals("Отзыв", TransliterateUtils.transliterateToCyrillic("Otzyv"));
++        assertEquals("Безшумный", TransliterateUtils.transliterateToCyrillic("Bezshumnyy"));
++        assertEquals("Джентльмены удачи", TransliterateUtils.transliterateToCyrillic("Dzhentl'meny udachi"));
++        // "sch" is "щ" like "shch"
++        assertEquals("Борщ", TransliterateUtils.transliterateToCyrillic("Borsch"));
++        assertEquals("Щука", TransliterateUtils.transliterateToCyrillic("Schuka"));
 +        // Non-Latin text is left alone
 +        assertEquals("Брат 2", TransliterateUtils.transliterateToCyrillic("Брат 2"));
 +    }

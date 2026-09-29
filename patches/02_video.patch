@@ -250,20 +250,6 @@ index 00000000..5603df7d
 +if "%OS%"=="Windows_NT" endlocal
 +
 +:omega
-diff --git a/proguard-project.txt b/proguard-project.txt
-index 12196953..23344ef0 100644
---- a/proguard-project.txt
-+++ b/proguard-project.txt
-@@ -4,7 +4,8 @@
- -keepattributes SourceFile,LineNumberTable,Exceptions,InnerClasses,Signature,EnclosingMethod,RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations
- 
- #### Application & project internal classes ####
---keep class com.archos.mediacenter.** { *; }
-+-keep class com.archos.** { *; }
-+-keep class com.novaplayer.** { *; }
- -keep class org.courville.nova.** { *; }
- 
- #### Serializable ####
 diff --git a/res/layout/player.xml b/res/layout/player.xml
 index 9e8d5020..ba3abd0f 100644
 --- a/res/layout/player.xml
@@ -302,7 +288,7 @@ index 9e8d5020..ba3abd0f 100644
 +    </FrameLayout>
  </RelativeLayout>
 diff --git a/res/values-ru/strings.xml b/res/values-ru/strings.xml
-index 2f752ef3..30fc9689 100644
+index 2f752ef3..4752b336 100644
 --- a/res/values-ru/strings.xml
 +++ b/res/values-ru/strings.xml
 @@ -467,12 +467,12 @@
@@ -323,7 +309,7 @@ index 2f752ef3..30fc9689 100644
      <string name="preferences_enable_dynamic_audio_delay_title">Динамическая оценка задержки звука/видео</string>
      <string name="preferences_enable_dynamic_audio_delay_summary">Использовать динамическую оценку задержки для лучшей синхронизации звука и видео, особенно с гарнитурой Bluetooth. Отключите, если возникают проблемы с синхронизацией.</string>
      <string name="preferences_enable_spatialization_title">Платформенный преобразователь</string>
-@@ -871,9 +871,143 @@
+@@ -871,9 +871,173 @@
      <string name="enable_sponsor_summary">Перейти по ссылке для пожертвований: важна любая помощь проекту.</string>
      <string name="upgrade_info">Информация об обновлении</string>
      <string name="v5_v6_upgrade_info">ВНИМАНИЕ: Это обновление Nova потребует пересканировать всю библиотеку мультимедиа. Чтобы избежать проблем, настоятельно рекомендуется полностью переустановить программу. Пожалуйста, ознакомьтесь с FAQ для подробностей.</string>
@@ -469,6 +455,36 @@ index 2f752ef3..30fc9689 100644
 +    <string name="s_commentary">комментарии</string>
 +    <string name="s_lyrics">текст песни</string>
 +    <string name="s_karaoke">караоке</string>
++
++    <!-- Оставшиеся строки интерфейса -->
++    <string name="cant_play_video">Не удаётся воспроизвести это видео</string>
++    <string name="empty_view_text_video">Видео не найдены</string>
++    <string name="content_all_videos">Все видео</string>
++    <string name="content_recently_added">Недавно добавленные</string>
++    <string name="content_recently_played">Недавно просмотренные</string>
++    <string name="content_title">Тип содержимого:</string>
++    <string name="validate_configuration">ОК</string>
++    <!-- sync with avos av.h: только первый пункт переводится -->
++    <string-array name="subtitles_types">
++        <item>Нет</item>
++        <item>VOBSUB</item>
++        <item>DVD</item>
++        <item>DVBT</item>
++        <item>TEXT</item>
++        <item>XSUB</item>
++        <item>SSA</item>
++        <item>ASS</item>
++        <item>EXT</item>
++        <item>MOV TEXT</item>
++        <item>PGS</item>
++    </string-array>
++    <string-array name="display_hdr">
++        <item>Нет</item>
++        <item>HDR10</item>
++        <item>HDR HLG</item>
++        <item>HDR10+</item>
++        <item>Dolby Vision</item>
++    </string-array>
  </resources>
 diff --git a/res/values/arrays.xml b/res/values/arrays.xml
 index e3f0e5f4..c24b1aa8 100644
@@ -1180,7 +1196,7 @@ index 70cbca45..66cdd76e 100644
  
      public void onVideoAspectChanged(IMediaPlayer mp, double aspect) {
 diff --git a/src/main/java/com/archos/mediacenter/video/player/PlayerActivity.java b/src/main/java/com/archos/mediacenter/video/player/PlayerActivity.java
-index fee3c1e4..6c6192d9 100644
+index fee3c1e4..ac405bd3 100644
 --- a/src/main/java/com/archos/mediacenter/video/player/PlayerActivity.java
 +++ b/src/main/java/com/archos/mediacenter/video/player/PlayerActivity.java
 @@ -109,6 +109,7 @@ import com.archos.filecorelibrary.FileUtils;
@@ -1249,7 +1265,7 @@ index fee3c1e4..6c6192d9 100644
  
          mRootView.setOnApplyWindowInsetsListener( new View.OnApplyWindowInsetsListener() {
              @Override
-@@ -1029,11 +1053,189 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -1029,11 +1053,202 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
                  Toast.LENGTH_SHORT).show();
          Intent intent = new Intent(this, PlayerService.class);
          bindService(intent, mPlayerServiceConnection, BIND_AUTO_CREATE);
@@ -1367,30 +1383,43 @@ index fee3c1e4..6c6192d9 100644
 +     * fetches the torrent playlist in the background so that next/previous episodes work.
 +     */
 +    private void fetchTorrServePlaylistIfAvailable() {
-+        if (mUri == null || !mUri.isHierarchical()) return;
-+        String scheme = mUri.getScheme();
++        // mUri is not populated yet at this point in the lifecycle (it is only set once
++        // PlayerService resolves the media and calls back setUri()), so the intent's own
++        // data is used to detect and build the TorrServe playlist request.
++        Intent intent = getIntent();
++        Uri uri = intent != null ? intent.getData() : null;
++        if (uri == null || !uri.isHierarchical()) return;
++        String scheme = uri.getScheme();
 +        if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) return;
-+        List<String> segments = mUri.getPathSegments();
++        List<String> segments = uri.getPathSegments();
 +        if (segments.isEmpty() || !"stream".equals(segments.get(0))) return;
-+        String link = mUri.getQueryParameter("link");
++        String link = uri.getQueryParameter("link");
 +        if (TextUtils.isEmpty(link)) return;
++        String path = uri.getPath();
++        if (TextUtils.isEmpty(path)) return;
 +
-+        Uri playlistUri = mUri.buildUpon()
-+                .path("/playlist")
++        // TorrServe serves the torrent's playlist at the same "/stream/<file>" path as the
++        // video itself, with ".m3u" appended to the file name (confirmed against a live
++        // TorrServe instance; "/playlist?link=..." used previously is not a real endpoint and
++        // always answers HTTP 400).
++        Uri playlistUri = uri.buildUpon()
++                .path(path + ".m3u")
 +                .clearQuery()
 +                .appendQueryParameter("link", link)
 +                .appendQueryParameter("m3u", "")
 +                .build();
-+        final Uri currentUri = mUri;
++        final Uri currentUri = uri;
 +        // The torrent topic describes every file of the torrent: use it for all episodes so that
 +        // they keep the localized show name (episode numbers come from the file names).
-+        final String topicTitle = getIntent().getStringExtra("title");
++        final String topicTitle = intent.getStringExtra("title");
 +
 +        M3uParser.parseAsync(this, playlistUri, new M3uParser.Callback() {
 +            @Override
 +            public void onSuccess(M3uParser.Result playlist) {
 +                if (isFinishing() || isDestroyed() || playlist.items.size() <= 1) return;
-+                if (!currentUri.equals(mUri)) return; // playback moved on meanwhile
++                // mUri may still be null (PlayerService has not resolved the media yet) or may
++                // already match the intent's URI; either way playback has not moved on.
++                if (mUri != null && !currentUri.equals(mUri)) return; // playback moved on meanwhile
 +                ArrayList<String> urls = new ArrayList<>(playlist.items.size());
 +                ArrayList<String> titles = new ArrayList<>(playlist.items.size());
 +                for (M3uParser.PlaylistItem item : playlist.items) {
@@ -1442,7 +1471,7 @@ index fee3c1e4..6c6192d9 100644
      }
  
      @SuppressWarnings("deprecation") // Bundle.get(key) is required for the untyped external header bundle.
-@@ -1161,6 +1363,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -1161,6 +1376,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          }
  
          mWasInPictureInPicture = false;
@@ -1450,7 +1479,7 @@ index fee3c1e4..6c6192d9 100644
      }
  
      @SuppressWarnings("deprecation") // requestVisibleBehind: deprecated API 26, no replacement for Android TV
-@@ -1170,6 +1373,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -1170,6 +1386,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          if (isFinishing() && !mLaunchFloatingPlayer && mPlayer != null) mPlayer.beginPlaybackExit();
          super.onPause();
          if (log.isDebugEnabled()) log.debug("onPause");
@@ -1458,7 +1487,7 @@ index fee3c1e4..6c6192d9 100644
  
          // Clock (for leanback devices only)
          if (getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK) || isChromeOS(mContext)) {
-@@ -1217,6 +1421,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -1217,6 +1434,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
      protected void onStop() {
          super.onStop();
          if (log.isDebugEnabled()) log.debug("onStop");
@@ -1466,7 +1495,7 @@ index fee3c1e4..6c6192d9 100644
  
          // Refresh the service-owned handoff position in case playback continued behind Home.
          if (PlayerService.sPlayerService != null) {
-@@ -1265,6 +1470,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -1265,6 +1483,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
      @Override
      protected void onDestroy() {
          if (log.isDebugEnabled()) log.debug("onDestroy");
@@ -1474,7 +1503,7 @@ index fee3c1e4..6c6192d9 100644
  
          // System-driven destruction after Home/screensaver is not an external-player exit.
          // finish() normally sends first; this guarded fallback covers framework finish paths.
-@@ -1521,7 +1727,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -1521,7 +1740,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          if(mWasInPictureInPicture) {
              if (PlayerService.sPlayerService != null) {
                  PlayerService.sPlayerService.stopAndSaveVideoState();
@@ -1483,7 +1512,7 @@ index fee3c1e4..6c6192d9 100644
              }
          }
      }
-@@ -1551,9 +1757,33 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -1551,9 +1770,33 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          return handled ? true : super.onKeyUp(keyCode, event);
      }
  
@@ -1517,7 +1546,7 @@ index fee3c1e4..6c6192d9 100644
  
          boolean handle = false;
          if(mPlayerController!=null)
-@@ -3289,6 +3519,31 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3289,6 +3532,31 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
  
      private final static String SHOW_FORMAT = "%s  -  S%02dE%02d  -  %s";
  
@@ -1549,7 +1578,7 @@ index fee3c1e4..6c6192d9 100644
      public void setVideoInfo(VideoDbInfo info){
          mVideoInfo = info;
          int viewMode = VideoEffect.getDefaultMode();
-@@ -3305,9 +3560,6 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3305,9 +3573,6 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
  
              if (getIntent() != null && mUri != null) {
                  getIntent().setData(mUri);
@@ -1559,7 +1588,7 @@ index fee3c1e4..6c6192d9 100644
              }
  
              if (!mCling && !TextUtils.isEmpty(mVideoInfo.title)) {
-@@ -3322,7 +3574,11 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3322,7 +3587,11 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
                  mMovieOrShowName = mVideoInfo.scraperTitle;
                  if (mMovieOrShowName != null) {
                      if (mVideoInfo.isShow) {
@@ -1572,12 +1601,12 @@ index fee3c1e4..6c6192d9 100644
                      } else {
                          mTitle = mMovieOrShowName;
                      }
-@@ -3330,6 +3586,12 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3330,6 +3599,12 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
                  if (!TextUtils.isEmpty(mVideoInfo.scraperCover)) {
                      mPosterPath = mVideoInfo.scraperCover;
                  }
 +            } else if (mStreamTitle != null) {
-+                // Not scraped (yet): combine the source title (torrent topic...) and the file name
++                // Not scraped (yet): the source title (torrent topic...) plus the episode number
 +                mTitle = mStreamTitle.title;
 +                if (mStreamTitle.isTvShow) {
 +                    mMovieOrShowName = mStreamTitle.showName;
@@ -1585,7 +1614,7 @@ index fee3c1e4..6c6192d9 100644
              }
  
              switch (mVideoInfo.videoStereo) {
-@@ -3375,7 +3637,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3375,7 +3650,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
              }
          }
  
@@ -1594,7 +1623,7 @@ index fee3c1e4..6c6192d9 100644
          if (log.isDebugEnabled()) log.debug("setVideoInfo: mTitle {}, call postVideoInfoAndPrepared", mTitle);
          postVideoInfoAndPrepared();
      }
-@@ -3384,6 +3646,9 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3384,6 +3659,9 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
       * set start state = removing progress + enabling controllers
       */
      private void  postVideoInfoAndPrepared() {
@@ -1604,7 +1633,7 @@ index fee3c1e4..6c6192d9 100644
          if (log.isDebugEnabled()) log.debug("postVideoInfoAndPrepared mVideoInfo!= null && (PlayerState PREPARED || PLAYING)={}", String.valueOf((PlayerService.sPlayerService.mPlayerState == PlayerService.PlayerState.PREPARED||PlayerService.sPlayerService.mPlayerState == PlayerService.PlayerState.PLAYING) && mVideoInfo != null));
          // ex onStreamingUriOK
          if ((PlayerService.sPlayerService.mPlayerState == PlayerService.PlayerState.PREPARED||PlayerService.sPlayerService.mPlayerState == PlayerService.PlayerState.PLAYING) && mVideoInfo != null) {
-@@ -3396,6 +3661,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3396,6 +3674,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
              mProgressView.setVisibility(View.GONE);
              PlayerService.sPlayerService.setAudioFilt();
              mPlayerController.start();
@@ -1612,7 +1641,7 @@ index fee3c1e4..6c6192d9 100644
              // Now that the video is loaded, Video info should be avalaible
              if (mInfoMenuItem != null) {
                  mInfoMenuItem.setVisible(mStreamingUri != null);
-@@ -3416,7 +3682,13 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3416,7 +3695,13 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
      }
  
      private void selectVideoInfo(VideoDbInfo videoInfo, PlayerService.ResumeSource resumeSource) {
@@ -1626,7 +1655,7 @@ index fee3c1e4..6c6192d9 100644
          if (PlayerService.sPlayerService != null) {
              PlayerService.sPlayerService.setVideoInfo(mVideoInfo, resumeSource);
              PlayerService.sPlayerService.requestIndexAndScrap();
-@@ -3426,7 +3698,12 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3426,7 +3711,12 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
  
      @Override
      public void onScraped(ScrapeDetailResult result) {
@@ -1640,7 +1669,7 @@ index fee3c1e4..6c6192d9 100644
      }
  
      /**
-@@ -3459,7 +3736,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -3459,7 +3749,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
  
          mPlayerController.setMediaPlayer(mPlayer);
  
@@ -1649,7 +1678,7 @@ index fee3c1e4..6c6192d9 100644
          //mVideoId = getIntent().getIntExtra("id", -1);
  
          mCling = intent.getBooleanExtra("cling", false);
-@@ -4314,6 +4591,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -4314,6 +4604,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          public void onSeekStart(int pos) {
              if (mSubtitleManager != null)
                  mSubtitleManager.onSeekStart(pos);
@@ -1657,7 +1686,7 @@ index fee3c1e4..6c6192d9 100644
          }
  
          public void onSeekComplete() {
-@@ -4327,6 +4605,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -4327,6 +4618,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          }
  
          public void onPlay(int state) {
@@ -1665,7 +1694,7 @@ index fee3c1e4..6c6192d9 100644
              if (mSubtitleManager != null)
                  mSubtitleManager.onPlay();
              sendVideoStateChanged();
-@@ -4352,6 +4631,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -4352,6 +4644,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
              refreshPhonePlayModeIntroSummary();
          }
          public void onPause(int state) {
@@ -1673,7 +1702,7 @@ index fee3c1e4..6c6192d9 100644
  
              if (mSubtitleManager != null)
                  mSubtitleManager.onPause();
-@@ -4375,9 +4655,12 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -4375,9 +4668,12 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          public void onOSDUpdate() {
              if (mPlayerController != null)
                  mPlayerController.setEnabled(true);
@@ -1686,7 +1715,7 @@ index fee3c1e4..6c6192d9 100644
              if (isStereoEffectOn()) {
                  int mode = vMetadata.getVideoTrack().s3dMode;
                  if (mode != 0) {
-@@ -4538,7 +4821,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -4538,7 +4834,7 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
          @Override
          public void onVideoDb(final VideoDbInfo localVideoInfo, final VideoDbInfo remoteVideoInfo) {
              if (log.isDebugEnabled()) log.debug("onVideoDb: localVideoInfo.subtitleTrack={}, remoteVideoInfo.subtitleTrack={}", ((localVideoInfo != null) ? localVideoInfo.subtitleTrack : "none"), ((remoteVideoInfo != null) ? remoteVideoInfo.subtitleTrack : "none"));
@@ -1695,7 +1724,7 @@ index fee3c1e4..6c6192d9 100644
              if (log.isDebugEnabled()) log.debug("onVideoDb: localVideoInfo.lastTimePlayed: {}, remoteVideoInfo.lastTimePlayed: {}", ((localVideoInfo != null) ? localVideoInfo.lastTimePlayed : "none"), ((remoteVideoInfo != null) ? remoteVideoInfo.lastTimePlayed : "none"));
              if (localVideoInfo != null) {
                  if (remoteVideoInfo != null) {
-@@ -4614,6 +4897,11 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -4614,6 +4910,11 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
  
          @Override
          public void setUri(Uri uri, Uri streamingUri){
@@ -1707,7 +1736,7 @@ index fee3c1e4..6c6192d9 100644
              mUri = uri;
              mStreamingUri = streamingUri;
              if (getIntent() != null) {
-@@ -4624,15 +4912,23 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
+@@ -4624,15 +4925,23 @@ public class PlayerActivity extends AppCompatActivity implements PlayerControlle
                      getIntent().removeExtra(KEY_STREAMING_URI);
                  }
              }
@@ -1740,26 +1769,163 @@ index fee3c1e4..6c6192d9 100644
          }
  
 diff --git a/src/main/java/com/archos/mediacenter/video/player/PlayerController.java b/src/main/java/com/archos/mediacenter/video/player/PlayerController.java
-index 12a61fd0..2ead265a 100644
+index 12a61fd0..6b6745c5 100644
 --- a/src/main/java/com/archos/mediacenter/video/player/PlayerController.java
 +++ b/src/main/java/com/archos/mediacenter/video/player/PlayerController.java
-@@ -1118,8 +1118,9 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+@@ -132,7 +132,8 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+     public static final int STATE_SEEK = 1;
+     public static final int STATE_OTHER = 42;
+ 
+-    public static final int SEEK_LONG_INIT_DELAY = 200;
++    // Longer than a normal remote key tap, so a tap is one step and never turns into a held seek
++    public static final int SEEK_LONG_INIT_DELAY = 400;
+     public static final int SEEK_LONG_DELAY = 50;
+     private static final int SEEK_ACCEL_MSECS[]  = {5000, 15000, 30000, 60000};
+     private static final int SEEK_SHORT_MSEC     = SEEK_ACCEL_MSECS[0];
+@@ -219,6 +220,8 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+     private boolean             mEnabled;
+     private boolean             mDragging;
+     private boolean             mSeekComplete;
++    // Step presses received while a seek was in flight; replayed from onAllSeekComplete()
++    private boolean             mPendingStepSeek;
+     private int                 mSeekKeyDirection;
+     private int                 mBarXYIconResource = R.drawable.video_format_arrow_horizontal;
+ 
+@@ -360,6 +363,7 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+         mSeekWasPlaying = false;
+         mIsStopped = false;
+         mSeekComplete = true;
++        mPendingStepSeek = false;
+         mLastRelativePosition = mNextSeek = mLastSeek = -1;
+         mLastCrop.bottom = mLastCrop.left = mLastCrop.right = mLastCrop.top = -1;
+         mActionBarShowing = mControlBarShowing = mVolumeBarShowing = mSystemBarGone = false;
+@@ -1103,9 +1107,9 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+                     break;
+                 case MSG_SEEK:
+                     if (log.isDebugEnabled()) log.debug("Handle: MSG_SEEK");
+-                    if (mNextSeek >= 0) {
+-                        boolean stop = false;
+-
++                    // Only advance while the key is still held: a short tap released before the
++                    // first tick must move by exactly one step (already applied in onSeek()).
++                    if (mNextSeek >= 0 && isSeekPressed()) {
+                         int step;
+                         if (mJoystickSeekingActive) {
+                             // Seeking with a joystick => set either a slow or a fast seeking speed depending on
+@@ -1118,62 +1122,33 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
                          }
  
                          if (mLastRelativePosition == -1) {
-+                            int stepMs = (step == 0) ? getSeekStepMs() : Math.max(SEEK_ACCEL_MSECS[step], getSeekStepMs());
-                             do {
+-                            do {
 -                                mNextSeek += SEEK_ACCEL_MSECS[step] * mSeekDir;
-+                                mNextSeek += stepMs * mSeekDir;
+-                            }
+-                            while ((mSeekDir > 0) ? (mNextSeek <= Player.sPlayer.getCurrentPosition()) : (mNextSeek >= Player.sPlayer.getCurrentPosition()));
+-
+-                            if (mNextSeek < 0) {
+-                                /* beginning of the video, don't seek anymore */
+-                                mNextSeek = 0;
+-                                stop = true;
+-                            } else if (mNextSeek >= Player.sPlayer.getDuration() - 2000) {
+-                                /* end of the video, don't seek anymore */
+-                                mNextSeek = Player.sPlayer.getDuration() - 2000;
+-                                stop = true;
+-                            }
++                            int stepMs = (step == 0) ? getSeekStepMs() : Math.max(SEEK_ACCEL_MSECS[step], getSeekStepMs());
++                            // Accumulate on the target itself: stepping from the reported player
++                            // position (stale while a seek runs) made the step size vary.
++                            mNextSeek = clampSeekTarget(mNextSeek + stepMs * mSeekDir);
+                         } else {
+-                            do {
+-                                mNextSeek += SEEK_ACCEL_PERMIL[step] * mSeekDir;
+-                            }
+-                            while ((mSeekDir > 0) ? (mNextSeek <= Player.sPlayer.getRelativePosition()) : (mNextSeek >= Player.sPlayer.getRelativePosition()));
+-
++                            mNextSeek += SEEK_ACCEL_PERMIL[step] * mSeekDir;
+                             if (mNextSeek < 0) {
+-                                /* beginning of the video, don't seek anymore */
+                                 mNextSeek = 0;
+-                                stop = true;
+                             } else if (mNextSeek >= 1000) {
+-                                /* end of the video, don't seek anymore */
+                                 mNextSeek = 980;
+-                                stop = true;
                              }
-                             while ((mSeekDir > 0) ? (mNextSeek <= Player.sPlayer.getCurrentPosition()) : (mNextSeek >= Player.sPlayer.getCurrentPosition()));
+                         }
+-                        if (mSeekComplete && isSeekPressed()) {
+-                            mSeekComplete = false;
+-                            if (log.isDebugEnabled()) log.debug("current pos is {} seek to {}", Player.sPlayer.getCurrentPosition(), mNextSeek);
+-                            Player.sPlayer.seekTo((int) mNextSeek);
+-                            updatePauseButton();
+-                        }
++                        mPendingStepSeek = true;
+                         mLongSeekTime += SEEK_LONG_DELAY;
+-                        if (stop) {
+-                            mNextSeek = -1;
+-                        }
++                    }
++                    if (mPendingStepSeek && mSeekComplete && mNextSeek >= 0) {
++                        issueStepSeek();
+                     }
+                     if (isSeekPressed()) {
+                         mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_SEEK),
+                                 SEEK_LONG_DELAY);
+                     } else {
+                         mDragging = false;
+-                        if (mNextSeek > 0 && mLongSeekTime > 2 * SEEK_LONG_DELAY) {
+-                            mSeekComplete = false;
+-                            if (log.isDebugEnabled()) log.debug("current pos is {} seek to {}", Player.sPlayer.getCurrentPosition(), mNextSeek);
+-                            Player.sPlayer.seekTo((int) mNextSeek);
+-                            updatePauseButton();
+-                        }
+-                        if (mSeekComplete && !mDragging) {
++                        // A seek still running replays any pending target from onAllSeekComplete()
++                        if (mSeekComplete && !mPendingStepSeek) {
+                             onSeekAndDraggingComplete();
+                         }
+-
+                     }
+                     setProgress();
+                     break;
+@@ -1528,6 +1503,16 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+             return;
  
-@@ -1565,6 +1566,30 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+         mSeekComplete = true;
++        if (mPendingStepSeek) {
++            if (mNextSeek != -1) {
++                // Steps were pressed while the previous seek was running: go to the accumulated target
++                if (log.isDebugEnabled()) log.debug("onAllSeekComplete: replay pending step seek to {}", mNextSeek);
++                issueStepSeek();
++                setProgress();
++                return;
++            }
++            mPendingStepSeek = false;
++        }
+         if (mSeekComplete && !mDragging) {
+             onSeekAndDraggingComplete();
+         }
+@@ -1565,18 +1550,56 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
          }
      }
  
 +    private int getSeekStepMs() {
 +        return VideoPreferencesCommon.getSeekStep(mContext) * 1000;
++    }
++
++    private int clampSeekTarget(int target) {
++        int duration = Player.sPlayer.getDuration();
++        if (duration > 2000 && target > duration - 2000) {
++            /* end of the video */
++            target = duration - 2000;
++        }
++        return Math.max(target, 0);
++    }
++
++    private void issueStepSeek() {
++        mPendingStepSeek = false;
++        mSeekComplete = false;
++        if (log.isDebugEnabled()) log.debug("current pos is {} seek to {}", Player.sPlayer.getCurrentPosition(), mNextSeek);
++        Player.sPlayer.seekTo(mNextSeek);
++        updatePauseButton();
 +    }
 +
 +    /**
@@ -1785,23 +1951,57 @@ index 12a61fd0..2ead265a 100644
      private void setNextSeekPos(int way) {
          if (log.isDebugEnabled()) log.debug("setNextSeekPos {}", way);
          mSeekDir = way;
-@@ -1572,8 +1597,9 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
-             if (mNextSeek == -1) {
-                 mNextSeek = Player.sPlayer.getCurrentPosition();
-             }
-+            int stepMs = getSeekStepMs();
-             do {
+         if (mLastRelativePosition == -1) {
+-            if (mNextSeek == -1) {
+-                mNextSeek = Player.sPlayer.getCurrentPosition();
+-            }
+-            do {
 -                mNextSeek += way * SEEK_SHORT_MSEC;
-+                mNextSeek += way * stepMs;
-             } while ((mSeekDir>0)?(mNextSeek <= Player.sPlayer.getCurrentPosition()):(mNextSeek >= Player.sPlayer.getCurrentPosition()));
+-            } while ((mSeekDir>0)?(mNextSeek <= Player.sPlayer.getCurrentPosition()):(mNextSeek >= Player.sPlayer.getCurrentPosition()));
+-
+-            } else {
++            // Accumulate on the pending target, never on the position reported while a seek
++            // is still running: exactly one step per press.
++            int base = (mNextSeek != -1) ? mNextSeek : Player.sPlayer.getCurrentPosition();
++            mNextSeek = clampSeekTarget(base + way * getSeekStepMs());
++        } else {
+             if (mNextSeek == -1) {
+                 mNextSeek = mLastRelativePosition = Player.sPlayer.getRelativePosition();
+             }
+@@ -1601,12 +1624,14 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+             }
+         }
  
-             } else {
++        mLongSeekTime = 0;
++        mDragging = longPress;
++        setNextSeekPos(way);
+         if (mSeekComplete) {
+-            mLongSeekTime = 0;
+-            mDragging = longPress;
+-            mSeekComplete = false;
+-            setNextSeekPos(way);
+-            Player.sPlayer.seekTo(mNextSeek);
++            issueStepSeek();
++        } else {
++            // A seek is still running: keep the accumulated target, it is sent once that seek completes
++            mPendingStepSeek = true;
+         }
+         updatePauseButton();
+         if (longPress) {
+@@ -1637,6 +1662,7 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+ 
+             mDragging = true;
+             mSeekComplete = false;
++            mPendingStepSeek = false;
+ 
+             // By removing these pending progress messages we make sure
+             // that a) we won't update the progress while the user adjusts
 @@ -2110,7 +2136,7 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
                              hideOsdHandler.removeCallbacks(hideOsdRunnable);
                              hideOsdHandler.postDelayed(hideOsdRunnable, 300);
                          }
 -                        Player.sPlayer.seekTo(Player.sPlayer.getCurrentPosition() - 10000);
-+                        Player.sPlayer.seekTo(Player.sPlayer.getCurrentPosition() - getSeekStepMs());
++                        onSeek(-1, false);
                      }
                  } else {
                      // Bottom 25% left: decrease audio speed
@@ -1810,7 +2010,7 @@ index 12a61fd0..2ead265a 100644
                              hideOsdHandler.postDelayed(hideOsdRunnable, 300);
                          }
 -                        Player.sPlayer.seekTo(Player.sPlayer.getCurrentPosition() + 10000);
-+                        Player.sPlayer.seekTo(Player.sPlayer.getCurrentPosition() + getSeekStepMs());
++                        onSeek(1, false);
                      }
                  } else {
                      // Bottom 25% right: increase audio speed
@@ -1852,7 +2052,7 @@ index 12a61fd0..2ead265a 100644
                      }
                  }
 diff --git a/src/main/java/com/archos/mediacenter/video/player/PlayerService.java b/src/main/java/com/archos/mediacenter/video/player/PlayerService.java
-index 505093a4..34a82675 100644
+index 505093a4..14695329 100644
 --- a/src/main/java/com/archos/mediacenter/video/player/PlayerService.java
 +++ b/src/main/java/com/archos/mediacenter/video/player/PlayerService.java
 @@ -61,7 +61,9 @@ import com.archos.mediacenter.utils.introdb.IntroDbQueryParams;
@@ -1873,7 +2073,7 @@ index 505093a4..34a82675 100644
      private Uri mNextUri;
      private long mNextVideoId;
      // keep in sync with res/values/arrays.xml - pref_play_mode_entries
-@@ -280,6 +283,81 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -280,6 +283,85 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
      private static final int PLAYMODE_REPEAT_FOLDER = 3;
      private static final int PLAYMODE_BINGE = 4;
  
@@ -1900,9 +2100,13 @@ index 505093a4..34a82675 100644
 +            mIntent.putStringArrayListExtra(KEY_REMOTE_URLS, urls);
 +            mIntent.putStringArrayListExtra(KEY_REMOTE_TITLES, titles);
 +            mIntent.putExtra(KEY_REMOTE_POSITION, position);
-+        }
-+        if (mRemoteUrlsList != null && mRemoteUrlsList.size() > 1) {
-+            updateNextVideo(false, false, false);
++            // updateNextVideo() reads mIntent. When this playlist arrives before onStart(intent)
++            // has run for the current video (background TorrServe fetch racing the service
++            // binding), mIntent is still null: postPreparedAndVideoDb() calls setPlayMode(), which
++            // recomputes the next video once mIntent (and the rest of the playback state) exists.
++            if (mRemoteUrlsList != null && mRemoteUrlsList.size() > 1) {
++                updateNextVideo(false, false, false);
++            }
 +        }
 +    }
 +
@@ -1955,7 +2159,7 @@ index 505093a4..34a82675 100644
      public static final int LAST_POSITION_UNKNOWN = -1;
      public static final int LAST_POSITION_END = -2;
  
-@@ -441,7 +519,7 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -441,7 +523,7 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
                  Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                          ? mIntent.getSerializableExtra(VIDEO, Video.class)
                          : (Video) mIntent.getSerializableExtra(VIDEO),
@@ -1964,7 +2168,7 @@ index 505093a4..34a82675 100644
          if (!sync) { // seems to be always the case in the calls
              mUpdateNextTask.setListener(new UpdateNextTask.Listener() {
                  @Override
-@@ -494,9 +572,13 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -494,9 +576,13 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
              mPlayer.setLooping(false);
              if (PLAYMODE_SINGLE == newPlaymode) {
                  if (log.isDebugEnabled()) log.debug("setPlaymode: PLAYMODE_SINGLE");
@@ -1981,7 +2185,7 @@ index 505093a4..34a82675 100644
              } else if (PLAYMODE_FOLDER == newPlaymode) {
                  if (log.isDebugEnabled()) log.debug("setPlaymode: PLAYMODE_FOLDER");
                  updateNextVideo(false, false, wait);
-@@ -512,6 +594,60 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -512,6 +598,60 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
          }
      }
  
@@ -2042,7 +2246,7 @@ index 505093a4..34a82675 100644
      /*
          TO TEST
          Indexing
-@@ -677,15 +813,28 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -677,15 +817,28 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
                  break;
          }
          if (log.isDebugEnabled()) log.debug("onStart() {}", mUri);
@@ -2073,7 +2277,7 @@ index 505093a4..34a82675 100644
              // Reusing metadata must not turn an explicit external position=0 (or malformed
              // position command) into a database resume for a new playback of the same URI.
              if (PlaybackResumePolicy.shouldPromoteSameUriToLastPosition(
-@@ -1016,7 +1165,7 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -1016,7 +1169,7 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
          if(mTorrentFilePosition==-1)
              prepareSubs();
          if(mPlayerFrontend!=null)
@@ -2082,7 +2286,7 @@ index 505093a4..34a82675 100644
          final int generation = ++mSourceRequestGeneration;
          final Player player = mPlayer;
          final Uri uri = mStreamingUri;
-@@ -1071,6 +1220,11 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -1071,6 +1224,11 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
  
          void setUri(Uri mUri, Uri streamingUri);
  
@@ -2094,7 +2298,7 @@ index 505093a4..34a82675 100644
          void setVideoInfo(VideoDbInfo mVideoInfo);
  
          void onEnd();
-@@ -1246,6 +1400,11 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -1246,6 +1404,11 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
                  mUpdateNextTask.setListener(null);
                  mUpdateNextTask = null;
              }
@@ -2106,7 +2310,7 @@ index 505093a4..34a82675 100644
              if (PERIODIC_BOOKMARK_SAVE)
                  mHandler.removeCallbacks(mAutoSaveTask);
              if (mAutoSkipTask != null)
-@@ -1275,7 +1434,7 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -1275,7 +1438,7 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
          mPlayerFrontend= playerFrontend;
  
          if(mUri!=null)
@@ -2115,21 +2319,20 @@ index 505093a4..34a82675 100644
          if (log.isDebugEnabled()) log.debug("switchPlayerFrontend {}", String.valueOf(mVideoInfo != null));
  
          if(mVideoInfo!=null)
-@@ -1510,9 +1669,11 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -1510,9 +1673,11 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
      private void requestVideoDb() {
          if (log.isDebugEnabled()) log.debug("requestVideoDb");
          mDatabaseInfoHasBeenRetrieved= true;
 +        // Auto-scrape: unscraped videos (notably unindexed streams) get online metadata for the
-+        // OSD. The source title (torrent topic, playlist title) is the best hint for streams.
++        // OSD. The file name is scraped, as upstream: a torrent topic is too free-form for it.
          mIndexHelper.requestVideoDb(mUri, mVideoId,
--                null,
+                 null,
 -                this, false, true);
-+                getSourceTitle(),
 +                this, true, true);
      }
  
      private class VideoObserver extends ContentObserver implements IndexHelper.ScraperTask.Listener {
-@@ -1549,19 +1710,7 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -1549,19 +1714,7 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
  
          @Override
          public void onScraperTaskResult(ScrapeDetailResult result) {
@@ -2150,7 +2353,7 @@ index 505093a4..34a82675 100644
          }
      }
  
-@@ -1600,8 +1749,10 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -1600,8 +1753,10 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
          if (!PrivateMode.isActive()&&mVideoInfo!=null) {
              mVideoInfo.lastTimePlayed = Long.valueOf(System.currentTimeMillis() / 1000L);
          }
@@ -2163,7 +2366,7 @@ index 505093a4..34a82675 100644
          if (ArchosFeatures.isAndroidTV(this) && !PrivateMode.isActive()) {
              updateNowPlayingMetadata();
          }
-@@ -1653,7 +1804,21 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -1653,7 +1808,21 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
      }
  
      @Override
@@ -2186,7 +2389,7 @@ index 505093a4..34a82675 100644
  
      private void postPreparedAndVideoDb() {
          if (log.isDebugEnabled()) log.debug("postPreparedAndVideoDb");
-@@ -1852,7 +2017,7 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -1852,7 +2021,7 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
  
      public void requestIndexAndScrap(){
          if (!PrivateMode.isActive()) {
@@ -2195,7 +2398,7 @@ index 505093a4..34a82675 100644
                  mHasRequestedIndexing = true;
  
                  getContentResolver().registerContentObserver(VideoStore.Video.Media.EXTERNAL_CONTENT_URI, true, mVideoObserver);
-@@ -1906,15 +2071,8 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -1906,15 +2075,8 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
              if(mPlayerFrontend!=null) {
                  mPlayerFrontend.onCompletion();
              }
@@ -2213,7 +2416,7 @@ index 505093a4..34a82675 100644
              mVideoId = mNextVideoId;
              mNextUri = null;
              mNextVideoId = -1;
-@@ -2714,23 +2872,46 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
+@@ -2714,23 +2876,46 @@ public class PlayerService extends Service implements Player.Listener, IndexHelp
          mSession.setActive(false);
      }
  
@@ -2237,11 +2440,11 @@ index 505093a4..34a82675 100644
 +                title += " - " + subtitle;
 +            }
 +        } else {
-+            // Not scraped: combine the source title (torrent topic, playlist title) and file name
++            // Not scraped: the source title (torrent topic...) as is, plus the episode number
 +            StreamTitleResolver.Result resolved = StreamTitleResolver.resolve(mUri, getSourceTitle());
 +            title = resolved.title;
 +            if (resolved.isTvShow) {
-+                subtitle = formatEpisode(resolved.season, resolved.episode, resolved.episodeTitle);
++                subtitle = formatEpisode(resolved.season, resolved.episode, null);
 +            }
 +        }
          metadataBuilder.putString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE,
@@ -2781,87 +2984,6 @@ index 00000000..9e118db2
 +        return colorTrc == TRC_SMPTE2084_PQ || colorTrc == TRC_ARIB_STD_B67_HLG ? badge + " HDR" : badge;
 +    }
 +}
-diff --git a/src/main/java/com/archos/mediacenter/video/utils/MediaLibraryBackupService.java b/src/main/java/com/archos/mediacenter/video/utils/MediaLibraryBackupService.java
-index e8272339..b1577567 100644
---- a/src/main/java/com/archos/mediacenter/video/utils/MediaLibraryBackupService.java
-+++ b/src/main/java/com/archos/mediacenter/video/utils/MediaLibraryBackupService.java
-@@ -33,6 +33,7 @@ import com.archos.mediacenter.video.R;
- import com.archos.mediacenter.utils.ShortcutDbAdapter;
- import com.archos.mediaprovider.DbHolder;
- import com.archos.mediaprovider.VideoDb;
-+import com.archos.mediaprovider.video.PackagePathRemapper;
- import com.archos.mediaprovider.video.VideoOpenHelper;
- import com.archos.mediascraper.MediaScraper;
- 
-@@ -382,6 +383,15 @@ public class MediaLibraryBackupService extends Service {
-                     zis.closeEntry();
-                 }
-             }
-+
-+            File mediaDb = getDatabasePath(DATABASE_NAME);
-+            if (mediaDb.exists()) {
-+                try (SQLiteDatabase db = SQLiteDatabase.openDatabase(mediaDb.getAbsolutePath(), null, SQLiteDatabase.OPEN_READWRITE)) {
-+                    PackagePathRemapper.remap(db, getPackageName());
-+                } catch (Exception e) {
-+                    log.error("importMediaLibrary: failed to remap package paths", e);
-+                }
-+            }
-         } finally {
-             dbHolder.unlockExclusive();
-         }
-diff --git a/src/main/java/com/archos/mediacenter/video/utils/PlayUtils.java b/src/main/java/com/archos/mediacenter/video/utils/PlayUtils.java
-index bfd068bc..b6630003 100644
---- a/src/main/java/com/archos/mediacenter/video/utils/PlayUtils.java
-+++ b/src/main/java/com/archos/mediacenter/video/utils/PlayUtils.java
-@@ -358,7 +358,7 @@ public class PlayUtils implements IndexHelper.Listener {
-                     } else {
-                         // TODO FIXME passing file to 3rd party player is not working
-                         subFile = new File(subPath);
--                        subUri = FileProvider.getUriForFile(context, "org.courville.nova.provider", subFile);
-+                        subUri = FileProvider.getUriForFile(context, context.getApplicationContext().getPackageName() + ".provider", subFile);
-                         MxSubPaths.add(subUri);
-                     }
-                     if (log.isDebugEnabled()) log.debug("onResumeReady: subPath {} -> subUri {}-> subLanguage {}", subPath, subUri, subLanguage);
-diff --git a/src/main/java/com/archos/mediacenter/video/utils/VideoMetadata.java b/src/main/java/com/archos/mediacenter/video/utils/VideoMetadata.java
-index 6c7c94b6..46f2c686 100644
---- a/src/main/java/com/archos/mediacenter/video/utils/VideoMetadata.java
-+++ b/src/main/java/com/archos/mediacenter/video/utils/VideoMetadata.java
-@@ -353,14 +353,32 @@ public class VideoMetadata implements Serializable {
-         return mFileSize;
-     }
- 
-+    // A metadata parcel from a libavos build with another key layout must not crash playback:
-+    // MediaMetadata returns defaults on type mismatch, and malformed parcels are logged here.
-     private static int getMetadataInt(MediaMetadata data, int key) {
--        return data.has(key) ? data.getInt(key) : 0;
-+        try {
-+            return data != null && data.has(key) ? data.getInt(key) : 0;
-+        } catch (RuntimeException e) {
-+            log.warn("getMetadataInt failed for key {}", key, e);
-+            return 0;
-+        }
-     }
-     private static boolean getMetadataBool(MediaMetadata data, int key) {
--        return data.has(key) ? data.getBoolean(key) : false;
-+        try {
-+            return data != null && data.has(key) && data.getBoolean(key);
-+        } catch (RuntimeException e) {
-+            log.warn("getMetadataBool failed for key {}", key, e);
-+            return false;
-+        }
-     }
-     private static String getMetadataString(MediaMetadata data, int key) {
--        return data.has(key) ? data.getString(key) : "";
-+        try {
-+            String value = data != null && data.has(key) ? data.getString(key) : null;
-+            return value != null ? value : "";
-+        } catch (RuntimeException e) {
-+            log.warn("getMetadataString failed for key {}", key, e);
-+            return "";
-+        }
-     }
- 
-     public ContentValues toContentValues(){
 diff --git a/src/main/java/com/archos/mediacenter/video/utils/VideoPreferencesCommon.java b/src/main/java/com/archos/mediacenter/video/utils/VideoPreferencesCommon.java
 index 7c62421f..f485c9dd 100644
 --- a/src/main/java/com/archos/mediacenter/video/utils/VideoPreferencesCommon.java

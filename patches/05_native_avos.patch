@@ -1,3 +1,19 @@
+diff --git a/Source/avos_mp_video.c b/Source/avos_mp_video.c
+index be046a8..2aae0eb 100644
+--- a/Source/avos_mp_video.c
++++ b/Source/avos_mp_video.c
+@@ -411,7 +411,10 @@ int avos_mp_video_seek(avos_mp_t *mp, avos_mp_video_t *video, uint32_t pos)
+ 		int wind_start, stream_total = 0, dir;
+ 
+ 		wind_start = stream_get_current_pos(video->s, &stream_total);
+-		dir = pos >= wind_start ? STREAM_SEEK_FORWARD : STREAM_SEEK_BACKWARD;
++		// Always land on the keyframe at or before the target: seek drops then advance
++		// playback to the exact requested time. A forward keyframe search would overshoot
++		// by up to one GOP, making fixed-step seeks (+15 s) land at varying positions.
++		dir = STREAM_SEEK_BACKWARD;
+ 		serprintf("avos_mp_video:avos_mp_video_seek current_pos=%d to pos=%d direction=%d\n", wind_start, pos, dir);
+ 		stream_seek_pos(video->s, pos, dir, STREAM_SEEK_RELAXED );
+ 	}
 diff --git a/Source/codec_sfdec2.c b/Source/codec_sfdec2.c
 index abc2127..ac6aa51 100644
 --- a/Source/codec_sfdec2.c
@@ -84,28 +100,18 @@ index b81ff09..47e39a7 100644
  //			LOG("drop[%2d]  blit %8d  venc %8d  diff %d", frame->index, frame->blit_time, venc_time, blit_duration);
  serprintf(" DROP(%3d)", blit_duration);
  			p->dropped ++;
-diff --git a/Source/stream_sync.c b/Source/stream_sync.c
-index 6bc2399..a607502 100644
---- a/Source/stream_sync.c
-+++ b/Source/stream_sync.c
-@@ -2480,14 +2480,18 @@ int stream_sync_pcm_audio_lead_gate( STREAM *s, int ac3_recoding )
- 	}
- 	int passthrough_mode = s->audio_sink->get_passthrough ?
- 		s->audio_sink->get_passthrough( s ) : 0;
--	if( passthrough_mode >= 1 ) {
-+	int gate_ms = STREAM_PCM_AUDIO_LEAD_GATE_MS;
-+	if( passthrough_mode == 2 ) {
-+		// Wider safety gate for mode 2 passthrough to prevent starvation runaway
-+		// while avoiding tight limit cycles during normal playback
-+		gate_ms = 500;
-+	} else if( passthrough_mode >= 1 ) {
- 		return 0;
- 	}
- 	int heard_ts = stream_get_heard_audio_ts( s, s->audio_time );
- 	if( heard_ts == STREAM_NO_PTS_VALUE ) {
- 		return 0;
- 	}
--	int gate_ms = STREAM_PCM_AUDIO_LEAD_GATE_MS;
- 	int user_av_delay = s->av_delay + stream_dbg_delay;
- 	if( user_av_delay < 0 ) {
- 		// The lead gate prevents producer runaway; it is not the realizer for
+diff --git a/Source/stream_video.c b/Source/stream_video.c
+index 60ca7e2..8c9c68d 100644
+--- a/Source/stream_video.c
++++ b/Source/stream_video.c
+@@ -5210,7 +5210,9 @@ serprintf("STUFF_ZERO!\n");
+ 		}
+ 		if( !s->seek_skip_initial_play ) {
+ 			int preview_shown = _stream_play_n_frames( s, 10, sc.time, old_time );
+-			if( preview_shown && !first_start && time >= 0 && old_time > target_ts &&
++			// Seeks land on the keyframe at or before the target in both directions,
++			// so refine forward seeks as well, not only backward ones.
++			if( preview_shown && !first_start && time >= 0 &&
+ 			    target_ts > sc.time &&
+ 			    !__atomic_load_n( &s->seek_preview_superseded, __ATOMIC_ACQUIRE ) ) {
+ 				// The keyframe preview provides immediate scrub feedback. Refine it

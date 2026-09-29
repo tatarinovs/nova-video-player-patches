@@ -11,8 +11,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ROOT_BASE=eacf19d        # aos-AVP: core.mk
-MEDIALIB_BASE=2be377f7   # MediaLib: upstream v6.4-lint
-VIDEO_BASE=d4ca9759      # Video: upstream v6.4-lint
+MEDIALIB_BASE=10ad7fba   # MediaLib: upstream v6.4-lint (v6.5.2)
+VIDEO_BASE=64f3c33e      # Video: upstream v6.4-lint (v6.5.2)
 FILECORE_BASE=8b27f02    # FileCoreLibrary: upstream v6.4-lint
 AVOS_BASE=8e3172b        # native/avos
 
