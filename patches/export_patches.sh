@@ -11,9 +11,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ROOT_BASE=eacf19d        # aos-AVP: core.mk
-MEDIALIB_BASE=10ad7fba   # MediaLib: upstream v6.4-lint (v6.5.2)
-VIDEO_BASE=64f3c33e      # Video: upstream v6.4-lint (v6.5.2)
-FILECORE_BASE=8b27f02    # FileCoreLibrary: upstream v6.4-lint
+MEDIALIB_BASE=3e904a4e   # MediaLib: upstream v6.4-lint (v6.5.3)
+VIDEO_BASE=8ddc54e0      # Video: upstream v6.4-lint (v6.5.3)
+FILECORE_BASE=1bfc01e    # FileCoreLibrary: upstream v6.4-lint (v6.5.3)
 AVOS_BASE=8e3172b        # native/avos
 
 # export_patch <repository> <base> <patch file> <pathspec>...
@@ -28,7 +28,7 @@ export_patch() {
 }
 
 export_patch MediaLib        "$MEDIALIB_BASE" patches/01_medialib.patch        build.gradle src test
-export_patch Video           "$VIDEO_BASE"    patches/02_video.patch           . ':(exclude).gradle' ':(exclude)build'
+export_patch Video           "$VIDEO_BASE"    patches/02_video.patch           . ':(exclude).gradle' ':(exclude)build' ':(exclude).classpath' ':(exclude).project'
 export_patch .               "$ROOT_BASE"     patches/03_root_core_mk.patch    core.mk
 export_patch FileCoreLibrary "$FILECORE_BASE" patches/04_filecorelibrary.patch src test
 export_patch native/avos     "$AVOS_BASE"     patches/05_native_avos.patch     Source

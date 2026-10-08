@@ -35,24 +35,41 @@ index abc2127..ac6aa51 100644
  		s->sync_a_time = -1;
  		p->render_offset_ns = -1;
 diff --git a/Source/stream_parser_ffmpeg.c b/Source/stream_parser_ffmpeg.c
-index 37c60a8..71fd0d0 100644
+index 37c60a8..da1109f 100644
 --- a/Source/stream_parser_ffmpeg.c
 +++ b/Source/stream_parser_ffmpeg.c
-@@ -1595,7 +1595,13 @@ DBGP serprintf("FFMPEG: wake\r\n");
+@@ -1561,6 +1561,11 @@ static int enqueue_media_packet(STREAM *s, AVQueue *q, AVPacket *packet, int aud
+ 			if (!(packet->flags & AV_PKT_FLAG_KEY)) return 0;
+ 			ff_p->drop_video_until_key = 0;
+ 		}
++	} else if (q == &ff_p->sq && audio_starved &&
++		   (used + cost > budget || q->packets >= FF_QUEUE_MAX_PACKETS - 1)) {
++		// Scanning a long audio gap: losing a subtitle packet beats failing playback with
++		// ENOMEM once the subtitle queue or the byte budget is exhausted.
++		return 0;
+ 	}
+ 	// One admitted packet may cross the normal budget. Beyond that, fail
+ 	// explicitly instead of silently losing audio or allocating without limit.
+@@ -1595,7 +1600,18 @@ DBGP serprintf("FFMPEG: wake\r\n");
  	// is bounded by enqueue_media_packet(), including retained keyframes and
  	// the selected subtitle queue.
  	int audio_packets = queue_packets(&ff_p->aq);
 +	int video_packets = queue_packets(&ff_p->vq);
  	int audio_starved = s->audio->valid && audio_packets == 0 && !s->audio_parse_end;
 +	int video_starved = s->video->valid && video_packets == 0 && !s->video_parse_end;
-+	// Allow demuxing past buffer limits if either audio is starved, or if video is starved
-+	// (bounded to 2x packet limit / 2x buffer size to prevent memory blowout on audio bursts)
++	// Allow demuxing past buffer limits if either audio is starved, or if video is starved.
++	// Unlike video, audio and subtitle packets cannot be dropped by enqueue_media_packet():
++	// a full queue (FF_QUEUE_MAX_PACKETS) or more than 2x the byte budget is a fatal ENOMEM.
++	// Keep a free slot in each of these queues and half a budget of headroom for the packet read.
++	int64_t starve_budget = MAX(ff_p->buffer_size, 1024 * 1024);
 +	int media_starved = audio_starved ||
-+		(video_starved && audio_packets < 2 * FF_QUEUE_MAX_PACKETS && mem_used < 2 * ff_p->buffer_size);
++		(video_starved && audio_packets < FF_QUEUE_MAX_PACKETS - 1 &&
++		 queue_packets(&ff_p->sq) < FF_QUEUE_MAX_PACKETS - 1 &&
++		 mem_used < starve_budget * 3 / 2);
  
  	// Small access units (notably TrueHD) can exhaust the packet count well
  	// before the byte budget. Stop BEFORE av_read_frame: queue capacity is
-@@ -1603,15 +1609,15 @@ DBGP serprintf("FFMPEG: wake\r\n");
+@@ -1603,15 +1619,15 @@ DBGP serprintf("FFMPEG: wake\r\n");
  	// consumed or dropped. Consumers only remove packets while this producer
  	// runs, so a free slot remains available for the next admission.
  	// Preserve the bounded audio-gap scan and seek-preroll policies below.

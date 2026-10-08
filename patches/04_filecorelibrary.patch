@@ -1,5 +1,5 @@
 diff --git a/src/com/archos/filecorelibrary/FileUtils.java b/src/com/archos/filecorelibrary/FileUtils.java
-index 5a3dd27..fd08dd7 100644
+index 5a3dd27..fe02bba 100644
 --- a/src/com/archos/filecorelibrary/FileUtils.java
 +++ b/src/com/archos/filecorelibrary/FileUtils.java
 @@ -206,6 +206,7 @@ public class FileUtils {
@@ -10,18 +10,24 @@ index 5a3dd27..fd08dd7 100644
              int dotPos = name.lastIndexOf('.');
              if (dotPos > 0) {
                  name = name.substring(0, dotPos);
-@@ -214,6 +215,28 @@ public class FileUtils {
+@@ -214,6 +215,35 @@ public class FileUtils {
          return name;
      }
  
 +    private static final Pattern HTTP_URL = Pattern.compile("^https?://.*", Pattern.CASE_INSENSITIVE);
-+    private static final Pattern URL_SUFFIX_AFTER_EXTENSION = Pattern.compile("(?<=\\.[A-Za-z0-9]{1,5})[?#].*$");
++    private static final String MEDIA_EXTENSIONS =
++            "(?:mkv|mp4|m4v|avi|mov|wmv|webm|flv|ts|m2ts|mts|mpg|mpeg|vob|iso|3gp|ogv|divx|rmvb|m3u8?)";
++    private static final Pattern URL_SUFFIX_AFTER_EXTENSION = Pattern.compile(
++            "(?<=\\." + MEDIA_EXTENSIONS + ")[?#].*$", Pattern.CASE_INSENSITIVE);
++    private static final Pattern ENDS_WITH_MEDIA_EXTENSION = Pattern.compile(
++            "\\." + MEDIA_EXTENSIONS + "$", Pattern.CASE_INSENSITIVE);
 +
 +    /**
 +     * Removes what cannot belong to a file name from streaming references: the query and fragment
 +     * of an HTTP(S) URL ("http://host/stream/video.mkv?link=...&play"), or a "?..."/"#..." suffix
-+     * directly following a file extension ("video.mkv?play"). Other '?' and '#' characters are
-+     * legitimate in local or SMB file names ("What?.mkv") and are preserved.
++     * directly following a media extension ("video.mkv?play"). Other '?' and '#' characters are
++     * legitimate in local or SMB file names ("What?.mkv", "What.If?.2021.mkv") and are preserved:
++     * a name which itself ends with a media extension is never cut.
 +     */
 +    public static String stripUrlQueryAndFragment(String name) {
 +        if (name == null) return null;
@@ -33,13 +39,14 @@ index 5a3dd27..fd08dd7 100644
 +            if (hash >= 0 && hash < end) end = hash;
 +            return name.substring(0, end);
 +        }
++        if (ENDS_WITH_MEDIA_EXTENSION.matcher(name).find()) return name;
 +        return URL_SUFFIX_AFTER_EXTENSION.matcher(name).replaceFirst("");
 +    }
 +
      public static String getExtension(String filename) {
          if (filename == null)
              return null;
-@@ -330,6 +353,9 @@ public class FileUtils {
+@@ -330,6 +360,9 @@ public class FileUtils {
  
      public static String getName(String file) {
          if (log.isDebugEnabled()) log.debug("getName input: {}", file);
@@ -51,10 +58,10 @@ index 5a3dd27..fd08dd7 100644
          if (log.isDebugEnabled()) log.debug("getName result: {}", file);
 diff --git a/test/java/com/archos/filecorelibrary/FileUtilsNameTest.java b/test/java/com/archos/filecorelibrary/FileUtilsNameTest.java
 new file mode 100644
-index 0000000..a4feef9
+index 0000000..3a210f8
 --- /dev/null
 +++ b/test/java/com/archos/filecorelibrary/FileUtilsNameTest.java
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,52 @@
 +// Copyright 2026 Courville Software
 +//
 +// Licensed under the Apache License, Version 2.0 (the "License");
@@ -97,5 +104,13 @@ index 0000000..a4feef9
 +        assertEquals("#Alive.mkv", FileUtils.getName("smb://server/share/#Alive.mkv"));
 +        assertEquals("What?", FileUtils.stripExtensionFromName("What?.mkv"));
 +        assertEquals("Кто я?", FileUtils.stripExtensionFromName("Кто я?"));
++    }
++
++    @Test
++    public void dottedLocalNamesKeepQuestionMarksAndHashes() {
++        assertEquals("What.If?.2021.mkv", FileUtils.getName("/storage/emulated/0/Movies/What.If?.2021.mkv"));
++        assertEquals("Who.Is.Who?.mkv", FileUtils.getName("smb://server/share/Who.Is.Who?.mkv"));
++        assertEquals("The.Avi#1.mkv", FileUtils.getName("/storage/emulated/0/Movies/The.Avi#1.mkv"));
++        assertEquals("What.If?.2021", FileUtils.stripExtensionFromName("What.If?.2021.mkv"));
 +    }
 +}

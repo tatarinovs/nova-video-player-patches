@@ -22,6 +22,43 @@ index 3e8788c1..f987d7b7 100644
              testLogging {
                  events "passed", "skipped", "failed", "standardOut", "standardError"
                  outputs.upToDateWhen {false}
+diff --git a/src/com/archos/mediacenter/filecoreextension/UriUtils.java b/src/com/archos/mediacenter/filecoreextension/UriUtils.java
+index d8b788a5..78dd0c17 100644
+--- a/src/com/archos/mediacenter/filecoreextension/UriUtils.java
++++ b/src/com/archos/mediacenter/filecoreextension/UriUtils.java
+@@ -100,19 +100,24 @@ public class UriUtils {
+         return isValidFqdn(hostname) || isIPv4Address(hostname) || isIPv6Address(hostname) || isValidSmbServer(hostname);
+     }
+ 
++    /**
++     * Checks that a path on a remote server is absolute and normalized: no empty ("//"), "." or
++     * ".." segment. It is checked as a string: canonicalizing it against the local file system
++     * rejected valid remote paths which are symbolic links on the device ("/etc", "/sdcard"),
++     * or Windows drive paths in unit tests.
++     */
+     public static boolean isValidPath(String pathname) {
+-        if (pathname == null) return false;
++        if (pathname == null || !pathname.startsWith("/") || pathname.indexOf('\0') >= 0) return false;
+         if ("/".equals(pathname)) return true;
+         if (pathname.endsWith("/"))
+             pathname = pathname.substring(0, pathname.length() - 1);
+-        File file = new File(pathname);
+-        try {
+-            String canonicalPath = file.getCanonicalPath();
+-            if (log.isDebugEnabled()) log.debug("isValidPath: input={} -> canonicalPath={}", pathname, canonicalPath);
+-            return canonicalPath.equals(pathname);
+-        } catch (IOException e) {
+-            return false;
++        for (String segment : pathname.substring(1).split("/", -1)) {
++            if (segment.isEmpty() || ".".equals(segment) || "..".equals(segment)) {
++                if (log.isDebugEnabled()) log.debug("isValidPath: invalid segment '{}' in {}", segment, pathname);
++                return false;
++            }
+         }
++        return true;
+     }
+ 
+     public static boolean isValidStringUri(String uriString) {
 diff --git a/src/com/archos/mediacenter/utils/ISO639codes.java b/src/com/archos/mediacenter/utils/ISO639codes.java
 index 11495172..5fe1dd81 100644
 --- a/src/com/archos/mediacenter/utils/ISO639codes.java
@@ -70,10 +107,10 @@ index 11495172..5fe1dd81 100644
      @SuppressWarnings("deprecation")
 diff --git a/src/com/archos/mediacenter/utils/videodb/ExternalBookmarks.java b/src/com/archos/mediacenter/utils/videodb/ExternalBookmarks.java
 new file mode 100644
-index 00000000..73644bb4
+index 00000000..b85b4038
 --- /dev/null
 +++ b/src/com/archos/mediacenter/utils/videodb/ExternalBookmarks.java
-@@ -0,0 +1,275 @@
+@@ -0,0 +1,281 @@
 +// Copyright 2026 Archos SA / Nova Video Player authors
 +//
 +// Licensed under the Apache License, Version 2.0 (the "License");
@@ -238,6 +275,12 @@ index 00000000..73644bb4
 +            return;
 +        }
 +        if (position <= MIN_RESUME_POSITION_MS) { // unknown position: keep what we had
++            editor.apply();
++            return;
++        }
++        if (duration <= 0) {
++            // Live streams (IPTV...) have no duration: resuming them would seek into the broadcast
++            if (log.isDebugEnabled()) log.debug("saveBookmark: no duration, not saving pos={} for key={}", position, key);
 +            editor.apply();
 +            return;
 +        }
@@ -660,6 +703,21 @@ index 00000000..c111b023
 +        return s == null || s.trim().isEmpty();
 +    }
 +}
+diff --git a/src/com/archos/medialib/MediaMetadata.java b/src/com/archos/medialib/MediaMetadata.java
+index 32d001b8..892bad41 100644
+--- a/src/com/archos/medialib/MediaMetadata.java
++++ b/src/com/archos/medialib/MediaMetadata.java
+@@ -315,9 +315,7 @@ public class MediaMetadata implements Parcelable
+      * {@hide}
+      */
+     public long getLong(final int key) {
+-        checkType(key, LONG_VAL);    /**
+-     * {@hide}
+-     */
++        checkType(key, LONG_VAL);
+         return mParcel.readLong();
+     }
+ 
 diff --git a/src/com/archos/mediascraper/preprocess/ParseUtils.java b/src/com/archos/mediascraper/preprocess/ParseUtils.java
 index 4df26c1b..986eac11 100644
 --- a/src/com/archos/mediascraper/preprocess/ParseUtils.java
@@ -1247,6 +1305,58 @@ index afee9ce2..3cf536ed 100644
          for (SearchCandidate candidate : candidates) {
              if (log.isDebugEnabled()) log.debug("getMatches2: trying candidate '{}' with year {}", candidate.query, candidate.year);
              // Temporarily update searchInfo with candidate values for the search call
+diff --git a/test/java/com/archos/mediacenter/filecoreextension/UriUtilsPathTest.java b/test/java/com/archos/mediacenter/filecoreextension/UriUtilsPathTest.java
+new file mode 100644
+index 00000000..3426c5fa
+--- /dev/null
++++ b/test/java/com/archos/mediacenter/filecoreextension/UriUtilsPathTest.java
+@@ -0,0 +1,46 @@
++// Copyright 2026 Courville Software
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++package com.archos.mediacenter.filecoreextension;
++
++import static org.junit.Assert.assertFalse;
++import static org.junit.Assert.assertTrue;
++
++import org.junit.Test;
++
++public class UriUtilsPathTest {
++
++    @Test
++    public void normalizedRemotePathsAreValid() {
++        assertTrue(UriUtils.isValidPath("/"));
++        assertTrue(UriUtils.isValidPath("/download"));
++        assertTrue(UriUtils.isValidPath("/download/"));
++        assertTrue(UriUtils.isValidPath("/Видео/Сериалы 2024"));
++        // Symbolic links on the device must not matter for a path on a server
++        assertTrue(UriUtils.isValidPath("/etc/video"));
++        assertTrue(UriUtils.isValidPath("/sdcard/Movies"));
++    }
++
++    @Test
++    public void relativeOrNonNormalizedPathsAreInvalid() {
++        assertFalse(UriUtils.isValidPath(null));
++        assertFalse(UriUtils.isValidPath(""));
++        assertFalse(UriUtils.isValidPath("download"));
++        assertFalse(UriUtils.isValidPath("//download"));
++        assertFalse(UriUtils.isValidPath("/download//movies"));
++        assertFalse(UriUtils.isValidPath("/download/./movies"));
++        assertFalse(UriUtils.isValidPath("/download/../etc"));
++        assertFalse(UriUtils.isValidPath("/download/.."));
++    }
++}
 diff --git a/test/java/com/archos/mediacenter/utils/TrackNamingTest.java b/test/java/com/archos/mediacenter/utils/TrackNamingTest.java
 index 105f1da8..57d8e799 100644
 --- a/test/java/com/archos/mediacenter/utils/TrackNamingTest.java
@@ -1271,10 +1381,10 @@ index 105f1da8..57d8e799 100644
          if ((disposition & 0x0080) != 0) return "Malentendants"; // Hearing Impaired
 diff --git a/test/java/com/archos/mediacenter/utils/videodb/ExternalBookmarksTest.java b/test/java/com/archos/mediacenter/utils/videodb/ExternalBookmarksTest.java
 new file mode 100644
-index 00000000..bf4ccf81
+index 00000000..9d0c8246
 --- /dev/null
 +++ b/test/java/com/archos/mediacenter/utils/videodb/ExternalBookmarksTest.java
-@@ -0,0 +1,99 @@
+@@ -0,0 +1,113 @@
 +// Copyright 2026 Archos SA / Nova Video Player authors
 +//
 +// Licensed under the Apache License, Version 2.0 (the "License");
@@ -1368,10 +1478,24 @@ index 00000000..bf4ccf81
 +                .putInt(TORRSERVE.toString() + "_pos", 60_000).commit();
 +        assertEquals(60_000, ExternalBookmarks.getBookmark(context, TORRSERVE));
 +
-+        ExternalBookmarks.saveBookmark(context, TORRSERVE, 90_000, 0, 0);
++        ExternalBookmarks.saveBookmark(context, TORRSERVE, 90_000, 3_600_000, 0);
 +        assertEquals(0, context.getSharedPreferences("external_bookmarks", Context.MODE_PRIVATE)
 +                .getInt(TORRSERVE.toString() + "_pos", 0));
 +        assertEquals(90_000, ExternalBookmarks.getBookmark(context, TORRSERVE));
++    }
++
++    @Test
++    public void liveStreamWithoutDurationIsNotBookmarked() {
++        Uri live = Uri.parse("http://iptv.example/live/channel1.ts");
++        ExternalBookmarks.saveBookmark(context, live, 600_000, 0, 0);
++        assertEquals(0, ExternalBookmarks.getBookmark(context, live));
++    }
++
++    @Test
++    public void missingDurationKeepsExistingBookmark() {
++        ExternalBookmarks.saveBookmark(context, TORRSERVE, 120_000, 3_600_000, 0);
++        ExternalBookmarks.saveBookmark(context, TORRSERVE, 150_000, 0, 0);
++        assertEquals(120_000, ExternalBookmarks.getBookmark(context, TORRSERVE));
 +    }
 +}
 diff --git a/test/java/com/archos/mediacenter/utils/videodb/StreamTitleResolverTest.java b/test/java/com/archos/mediacenter/utils/videodb/StreamTitleResolverTest.java
@@ -1472,6 +1596,35 @@ index 00000000..9419ae0e
 +        assertNull(StreamTitleResolver.extractFileName(Uri.parse("http://host/stream?link=abcdef")));
 +    }
 +}
+diff --git a/test/java/com/archos/mediascraper/ShowTagsPersistenceTest.java b/test/java/com/archos/mediascraper/ShowTagsPersistenceTest.java
+index f06fefd2..51b78480 100644
+--- a/test/java/com/archos/mediascraper/ShowTagsPersistenceTest.java
++++ b/test/java/com/archos/mediascraper/ShowTagsPersistenceTest.java
+@@ -55,10 +55,10 @@ public class ShowTagsPersistenceTest {
+                     MatrixCursor cursor = new MatrixCursor(projection);
+                     if (ScraperStore.Show.URI.ALL.equals(uri) && projection.length == 2) {
+                         cursor.addRow(new Object[] { 31L, 2252L });
+-                    } else if (ScraperStore.Show.URI.ALL.equals(uri) && projection.length == 10) {
++                    } else if (ScraperStore.Show.URI.ALL.equals(uri) && projection.length == 14) {
+                         cursor.addRow(new Object[] {
+                                 31L, null, 0f, null, null, "tt0103514", 2252L, -1L, -1L,
+-                                null
++                                null, null, null, null, null
+                         });
+                     } else if (projection.length == 1) {
+                         cursor.addRow(new Object[] { 0 });
+@@ -100,9 +100,9 @@ public class ShowTagsPersistenceTest {
+                     String[] projection = invocation.getArgument(1);
+                     MatrixCursor cursor = new MatrixCursor(projection);
+                     if (insertAttempted.get() && ScraperStore.Show.URI.ALL.equals(uri)
+-                            && projection.length == 10) {
++                            && projection.length == 14) {
+                         cursor.addRow(new Object[] {
+-                                77L, null, 0f, null, null, null, 5678L, -1L, -1L, null
++                                77L, null, 0f, null, null, null, 5678L, -1L, -1L, null, null, null, null, null
+                         });
+                     }
+                     return cursor;
 diff --git a/test/java/com/archos/mediascraper/preprocess/TransliterateUtilsTest.java b/test/java/com/archos/mediascraper/preprocess/TransliterateUtilsTest.java
 new file mode 100644
 index 00000000..0f8d575c
