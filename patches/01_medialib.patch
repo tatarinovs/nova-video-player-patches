@@ -1,8 +1,8 @@
 diff --git a/build.gradle b/build.gradle
-index f2d8225b..62ffcdc5 100644
+index 3e8788c1..f987d7b7 100644
 --- a/build.gradle
 +++ b/build.gradle
-@@ -110,9 +110,19 @@ android {
+@@ -113,9 +113,19 @@ android {
      }
      testOptions {
          unitTests.includeAndroidResources = true

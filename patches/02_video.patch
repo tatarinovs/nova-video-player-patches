@@ -127,7 +127,7 @@ index ba89ce31..f3f30ea7 100644
              <intent-filter>
                  <action android:name="archos.intent.action.RESUME_VIDEOPLAYER" />
 diff --git a/build.gradle b/build.gradle
-index bd5f1b77..00091f17 100644
+index b1f12925..a3af6a84 100644
 --- a/build.gradle
 +++ b/build.gradle
 @@ -137,6 +137,10 @@ android {
@@ -288,7 +288,7 @@ index 9e8d5020..ba3abd0f 100644
 +    </FrameLayout>
  </RelativeLayout>
 diff --git a/res/values-ru/strings.xml b/res/values-ru/strings.xml
-index 2f752ef3..4752b336 100644
+index 2f752ef3..a8c35192 100644
 --- a/res/values-ru/strings.xml
 +++ b/res/values-ru/strings.xml
 @@ -467,12 +467,12 @@
@@ -309,7 +309,7 @@ index 2f752ef3..4752b336 100644
      <string name="preferences_enable_dynamic_audio_delay_title">Динамическая оценка задержки звука/видео</string>
      <string name="preferences_enable_dynamic_audio_delay_summary">Использовать динамическую оценку задержки для лучшей синхронизации звука и видео, особенно с гарнитурой Bluetooth. Отключите, если возникают проблемы с синхронизацией.</string>
      <string name="preferences_enable_spatialization_title">Платформенный преобразователь</string>
-@@ -871,9 +871,173 @@
+@@ -871,9 +871,179 @@
      <string name="enable_sponsor_summary">Перейти по ссылке для пожертвований: важна любая помощь проекту.</string>
      <string name="upgrade_info">Информация об обновлении</string>
      <string name="v5_v6_upgrade_info">ВНИМАНИЕ: Это обновление Nova потребует пересканировать всю библиотеку мультимедиа. Чтобы избежать проблем, настоятельно рекомендуется полностью переустановить программу. Пожалуйста, ознакомьтесь с FAQ для подробностей.</string>
@@ -323,6 +323,12 @@ index 2f752ef3..4752b336 100644
 +    <string name="seek_step_20s">20 секунд</string>
 +    <string name="seek_step_30s">30 секунд</string>
 +    <string name="seek_step_60s">60 секунд</string>
++    <string name="preferences_seek_delay_title">Задержка перемотки</string>
++    <string name="seek_delay_off">Выкл. (перематывать при каждом нажатии)</string>
++    <string name="seek_delay_300ms">300 мс</string>
++    <string name="seek_delay_500ms">500 мс</string>
++    <string name="seek_delay_750ms">750 мс</string>
++    <string name="seek_delay_1000ms">1 секунда</string>
 +    <string name="next_previous_keys_action_title">Кнопки «следующее / предыдущее»</string>
 +    <string name="next_previous_keys_action_switch_video">Переключать видео и серии</string>
 +    <string name="next_previous_keys_action_audio_speed">Менять скорость воспроизведения</string>
@@ -487,10 +493,10 @@ index 2f752ef3..4752b336 100644
 +    </string-array>
  </resources>
 diff --git a/res/values/arrays.xml b/res/values/arrays.xml
-index e3f0e5f4..c24b1aa8 100644
+index e3f0e5f4..084a6ff1 100644
 --- a/res/values/arrays.xml
 +++ b/res/values/arrays.xml
-@@ -271,4 +271,53 @@
+@@ -271,4 +271,69 @@
          <item>blue</item>
          <item>black</item>
      </string-array>
@@ -513,6 +519,22 @@ index e3f0e5f4..c24b1aa8 100644
 +        <item>20</item>
 +        <item>30</item>
 +        <item>60</item>
++    </string-array>
++
++    <string-array name="seek_delay_entries">
++        <item>@string/seek_delay_off</item>
++        <item>@string/seek_delay_300ms</item>
++        <item>@string/seek_delay_500ms</item>
++        <item>@string/seek_delay_750ms</item>
++        <item>@string/seek_delay_1000ms</item>
++    </string-array>
++
++    <string-array name="seek_delay_entryvalues" translatable="false">
++        <item>0</item>
++        <item>300</item>
++        <item>500</item>
++        <item>750</item>
++        <item>1000</item>
 +    </string-array>
 +
 +    <string-array name="next_previous_keys_action_entries">
@@ -545,10 +567,10 @@ index e3f0e5f4..c24b1aa8 100644
 +    </string-array>
  </resources>
 diff --git a/res/values/strings.xml b/res/values/strings.xml
-index 4ef2df73..38d8abb7 100644
+index 4ef2df73..381653c3 100644
 --- a/res/values/strings.xml
 +++ b/res/values/strings.xml
-@@ -1051,6 +1051,27 @@
+@@ -1051,6 +1051,33 @@
      <string name="s_commentary">commentary</string>
      <string name="s_lyrics">lyrics</string>
      <string name="s_karaoke">karaoke</string>
@@ -561,6 +583,12 @@ index 4ef2df73..38d8abb7 100644
 +    <string name="seek_step_20s">20 seconds</string>
 +    <string name="seek_step_30s">30 seconds</string>
 +    <string name="seek_step_60s">60 seconds</string>
++    <string name="preferences_seek_delay_title">Seek delay</string>
++    <string name="seek_delay_off">Off (seek on every press)</string>
++    <string name="seek_delay_300ms">300 ms</string>
++    <string name="seek_delay_500ms">500 ms</string>
++    <string name="seek_delay_750ms">750 ms</string>
++    <string name="seek_delay_1000ms">1 second</string>
 +    <string name="next_previous_keys_action_title">Next / previous keys</string>
 +    <string name="next_previous_keys_action_switch_video">Switch video or episode</string>
 +    <string name="next_previous_keys_action_audio_speed">Change playback speed</string>
@@ -576,7 +604,7 @@ index 4ef2df73..38d8abb7 100644
  
      <string name="ui_choice_title">It seems that you are using Nova Video Player on a TV.\nIf it is actually the case, we recommend using our new TV user interface</string>
      <string name="ui_choice_tv">TV interface</string>
-@@ -1058,4 +1079,9 @@
+@@ -1058,4 +1085,9 @@
      <string name="ui_choice_help">You can change your choice in the application settings later</string>
      <string name="workgroup">Workgroup</string>
  
@@ -616,10 +644,10 @@ index a3bace0a..59465676 100644
  </PreferenceScreen>
 +
 diff --git a/res/xml/preferences_video.xml b/res/xml/preferences_video.xml
-index a602e0fb..cf747ec5 100644
+index a602e0fb..4ad28071 100644
 --- a/res/xml/preferences_video.xml
 +++ b/res/xml/preferences_video.xml
-@@ -99,6 +99,26 @@
+@@ -99,6 +99,36 @@
              android:summary="@string/preferences_audio_speed_mode_summary"
              android:title="@string/preferences_audio_speed_mode_title"
              app:iconSpaceReserved="false"/>
@@ -631,6 +659,16 @@ index a602e0fb..cf747ec5 100644
 +            android:key="seek_step"
 +            android:persistent="true"
 +            android:title="@string/preferences_seek_step_title"
++            app:useSimpleSummaryProvider="true"
++            app:iconSpaceReserved="false"/>
++        <ListPreference
++            android:defaultValue="300"
++            android:dialogTitle="@string/preferences_seek_delay_title"
++            android:entries="@array/seek_delay_entries"
++            android:entryValues="@array/seek_delay_entryvalues"
++            android:key="seek_delay"
++            android:persistent="true"
++            android:title="@string/preferences_seek_delay_title"
 +            app:useSimpleSummaryProvider="true"
 +            app:iconSpaceReserved="false"/>
 +        <ListPreference
@@ -646,7 +684,7 @@ index a602e0fb..cf747ec5 100644
          <CheckBoxPreference
              android:defaultValue="true"
              android:key="enable_dynamic_audio_delay"
-@@ -290,6 +310,17 @@
+@@ -290,6 +320,17 @@
              android:title="@string/hide_controls_on_pause"
              app:iconSpaceReserved="false"/>
  
@@ -1769,10 +1807,17 @@ index fee3c1e4..ac405bd3 100644
          }
  
 diff --git a/src/main/java/com/archos/mediacenter/video/player/PlayerController.java b/src/main/java/com/archos/mediacenter/video/player/PlayerController.java
-index 12a61fd0..6b6745c5 100644
+index 12a61fd0..b40ad5d8 100644
 --- a/src/main/java/com/archos/mediacenter/video/player/PlayerController.java
 +++ b/src/main/java/com/archos/mediacenter/video/player/PlayerController.java
-@@ -132,7 +132,8 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+@@ -126,13 +126,15 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+     private static final int MSG_HIDE_SYSTEM_BAR = 6;
+     private static final int MSG_OVERLAY_FADE_OUT = 7;
+     private static final int MSG_SWITCH_FULLSCREEN_WITH_CUTOUT = 8;
++    private static final int MSG_SEEK_COMMIT = 9;
+ 
+     // introducing states to inform listeners/player that it is in some specific state
+     public static final int STATE_NORMAL = 0;
      public static final int STATE_SEEK = 1;
      public static final int STATE_OTHER = 42;
  
@@ -1782,24 +1827,27 @@ index 12a61fd0..6b6745c5 100644
      public static final int SEEK_LONG_DELAY = 50;
      private static final int SEEK_ACCEL_MSECS[]  = {5000, 15000, 30000, 60000};
      private static final int SEEK_SHORT_MSEC     = SEEK_ACCEL_MSECS[0];
-@@ -219,6 +220,8 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+@@ -219,6 +221,10 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
      private boolean             mEnabled;
      private boolean             mDragging;
      private boolean             mSeekComplete;
 +    // Step presses received while a seek was in flight; replayed from onAllSeekComplete()
 +    private boolean             mPendingStepSeek;
++    // Position the current run of step presses started from, for the accumulated offset OSD
++    private int                 mSeekOrigin;
      private int                 mSeekKeyDirection;
      private int                 mBarXYIconResource = R.drawable.video_format_arrow_horizontal;
  
-@@ -360,6 +363,7 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+@@ -360,6 +366,8 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
          mSeekWasPlaying = false;
          mIsStopped = false;
          mSeekComplete = true;
 +        mPendingStepSeek = false;
++        mHandler.removeMessages(MSG_SEEK_COMMIT);
          mLastRelativePosition = mNextSeek = mLastSeek = -1;
          mLastCrop.bottom = mLastCrop.left = mLastCrop.right = mLastCrop.top = -1;
          mActionBarShowing = mControlBarShowing = mVolumeBarShowing = mSystemBarGone = false;
-@@ -1103,9 +1107,9 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+@@ -1103,9 +1111,9 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
                      break;
                  case MSG_SEEK:
                      if (log.isDebugEnabled()) log.debug("Handle: MSG_SEEK");
@@ -1812,9 +1860,12 @@ index 12a61fd0..6b6745c5 100644
                          int step;
                          if (mJoystickSeekingActive) {
                              // Seeking with a joystick => set either a slow or a fast seeking speed depending on
-@@ -1118,62 +1122,33 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+@@ -1117,63 +1125,47 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+                             step = getSeekAccelStep(mLongSeekTime);
                          }
  
++                        // The key is held: accelerated seeking takes over, no more presses to collect
++                        mHandler.removeMessages(MSG_SEEK_COMMIT);
                          if (mLastRelativePosition == -1) {
 -                            do {
 -                                mNextSeek += SEEK_ACCEL_MSECS[step] * mSeekDir;
@@ -1863,7 +1914,9 @@ index 12a61fd0..6b6745c5 100644
 -                            mNextSeek = -1;
 -                        }
 +                    }
-+                    if (mPendingStepSeek && mSeekComplete && mNextSeek >= 0) {
++                    // Released before the seek delay elapsed: MSG_SEEK_COMMIT sends the target
++                    if (mPendingStepSeek && mSeekComplete && mNextSeek >= 0
++                            && !hasMessages(MSG_SEEK_COMMIT)) {
 +                        issueStepSeek();
                      }
                      if (isSeekPressed()) {
@@ -1883,13 +1936,27 @@ index 12a61fd0..6b6745c5 100644
                              onSeekAndDraggingComplete();
                          }
 -
++                    }
++                    setProgress();
++                    break;
++                case MSG_SEEK_COMMIT:
++                    if (log.isDebugEnabled()) log.debug("Handle: MSG_SEEK_COMMIT");
++                    // No step pressed during the seek delay: one seek to the accumulated target.
++                    // A seek still running replays it from onAllSeekComplete().
++                    if (mPendingStepSeek && mSeekComplete && mNextSeek >= 0) {
++                        issueStepSeek();
                      }
                      setProgress();
                      break;
-@@ -1528,6 +1503,16 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+@@ -1528,6 +1520,21 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
              return;
  
          mSeekComplete = true;
++        if (mHandler.hasMessages(MSG_SEEK_COMMIT)) {
++            // Still collecting step presses: MSG_SEEK_COMMIT seeks, playback resumes after that one
++            setProgress();
++            return;
++        }
 +        if (mPendingStepSeek) {
 +            if (mNextSeek != -1) {
 +                // Steps were pressed while the previous seek was running: go to the accumulated target
@@ -1903,7 +1970,7 @@ index 12a61fd0..6b6745c5 100644
          if (mSeekComplete && !mDragging) {
              onSeekAndDraggingComplete();
          }
-@@ -1565,18 +1550,56 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+@@ -1565,18 +1572,57 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
          }
      }
  
@@ -1962,25 +2029,34 @@ index 12a61fd0..6b6745c5 100644
 -            } else {
 +            // Accumulate on the pending target, never on the position reported while a seek
 +            // is still running: exactly one step per press.
-+            int base = (mNextSeek != -1) ? mNextSeek : Player.sPlayer.getCurrentPosition();
++            if (mNextSeek == -1) mSeekOrigin = Player.sPlayer.getCurrentPosition();
++            int base = (mNextSeek != -1) ? mNextSeek : mSeekOrigin;
 +            mNextSeek = clampSeekTarget(base + way * getSeekStepMs());
 +        } else {
              if (mNextSeek == -1) {
                  mNextSeek = mLastRelativePosition = Player.sPlayer.getRelativePosition();
              }
-@@ -1601,12 +1624,14 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+@@ -1601,12 +1647,21 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
              }
          }
  
-+        mLongSeekTime = 0;
-+        mDragging = longPress;
-+        setNextSeekPos(way);
-         if (mSeekComplete) {
+-        if (mSeekComplete) {
 -            mLongSeekTime = 0;
 -            mDragging = longPress;
 -            mSeekComplete = false;
 -            setNextSeekPos(way);
 -            Player.sPlayer.seekTo(mNextSeek);
++        mLongSeekTime = 0;
++        mDragging = longPress;
++        setNextSeekPos(way);
++        int seekDelay = VideoPreferencesCommon.getSeekDelay(mContext);
++        if (seekDelay > 0) {
++            // Collect quick presses into a single seek, sent once no press came for seekDelay
++            mPendingStepSeek = true;
++            mHandler.removeMessages(MSG_SEEK_COMMIT);
++            mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_SEEK_COMMIT), seekDelay);
++            showSeekOffsetOSD(seekDelay);
++        } else if (mSeekComplete) {
 +            issueStepSeek();
 +        } else {
 +            // A seek is still running: keep the accumulated target, it is sent once that seek completes
@@ -1988,15 +2064,16 @@ index 12a61fd0..6b6745c5 100644
          }
          updatePauseButton();
          if (longPress) {
-@@ -1637,6 +1662,7 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+@@ -1637,6 +1692,8 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
  
              mDragging = true;
              mSeekComplete = false;
 +            mPendingStepSeek = false;
++            mHandler.removeMessages(MSG_SEEK_COMMIT);
  
              // By removing these pending progress messages we make sure
              // that a) we won't update the progress while the user adjusts
-@@ -2110,7 +2136,7 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+@@ -2110,7 +2167,7 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
                              hideOsdHandler.removeCallbacks(hideOsdRunnable);
                              hideOsdHandler.postDelayed(hideOsdRunnable, 300);
                          }
@@ -2005,7 +2082,7 @@ index 12a61fd0..6b6745c5 100644
                      }
                  } else {
                      // Bottom 25% left: decrease audio speed
-@@ -2131,7 +2157,7 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+@@ -2131,7 +2188,7 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
                              hideOsdHandler.removeCallbacks(hideOsdRunnable);
                              hideOsdHandler.postDelayed(hideOsdRunnable, 300);
                          }
@@ -2014,7 +2091,34 @@ index 12a61fd0..6b6745c5 100644
                      }
                  } else {
                      // Bottom 25% right: increase audio speed
-@@ -2372,6 +2398,10 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+@@ -2234,6 +2291,26 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+         if (log.isDebugEnabled()) log.debug("showAudioSpeedOSD: audioSpeed={}", audioSpeed);
+     }
+ 
++    /** Shows the offset collected by the step presses (e.g. "+1:00") until the seek is sent. */
++    private void showSeekOffsetOSD(int seekDelay) {
++        if (mLastRelativePosition != -1 || mNextSeek < 0) return;
++        int offset = mNextSeek - mSeekOrigin;
++        TextView shown = offset < 0 ? mOsdLeftTextView : mOsdRightTextView;
++        TextView hidden = offset < 0 ? mOsdRightTextView : mOsdLeftTextView;
++        if (shown == null) return;
++        int seconds = Math.abs(offset) / 1000;
++        String text = (offset < 0 ? "−" : "+") + (seconds >= 3600
++                ? String.format(Locale.US, "%d:%02d:%02d", seconds / 3600, (seconds / 60) % 60, seconds % 60)
++                : String.format(Locale.US, "%d:%02d", seconds / 60, seconds % 60));
++        Drawable osdIcon = getDrawable(mContext, offset < 0 ? R.drawable.media_fast_rewind : R.drawable.media_fast_forward);
++        shown.setText(text);
++        shown.setCompoundDrawablesWithIntrinsicBounds(osdIcon, null, null, null);
++        shown.setVisibility(View.VISIBLE);
++        if (hidden != null) hidden.setVisibility(View.INVISIBLE);
++        hideOsdHandler.removeCallbacks(hideOsdRunnable);
++        hideOsdHandler.postDelayed(hideOsdRunnable, seekDelay + 500);
++    }
++
+     public boolean hasFocus() {
+         // TODO Auto-generated method stub
+         return mControlBar.isFocused() || mVolumeBar.isFocused();
+@@ -2372,6 +2449,10 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
                                  onSeek(-1, true);
                              }
                              return true;
@@ -2025,7 +2129,7 @@ index 12a61fd0..6b6745c5 100644
                          case KeyEvent.KEYCODE_MEDIA_NEXT:
                          case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
                              return true; // do nothing
-@@ -2477,21 +2507,17 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
+@@ -2477,21 +2558,17 @@ public class PlayerController implements View.OnTouchListener, OnGenericMotionLi
                          case KeyEvent.KEYCODE_PROG_BLUE:
                              mSettings.switchAudioTrack();
                              return true;
@@ -2985,22 +3089,24 @@ index 00000000..9e118db2
 +    }
 +}
 diff --git a/src/main/java/com/archos/mediacenter/video/utils/VideoPreferencesCommon.java b/src/main/java/com/archos/mediacenter/video/utils/VideoPreferencesCommon.java
-index 7c62421f..f485c9dd 100644
+index 7c62421f..a7d7a0fa 100644
 --- a/src/main/java/com/archos/mediacenter/video/utils/VideoPreferencesCommon.java
 +++ b/src/main/java/com/archos/mediacenter/video/utils/VideoPreferencesCommon.java
-@@ -162,6 +162,11 @@ public class VideoPreferencesCommon implements OnSharedPreferenceChangeListener
+@@ -162,6 +162,13 @@ public class VideoPreferencesCommon implements OnSharedPreferenceChangeListener
      public static final String AUDIO_SPEED_MODE_AUDIOTRACK = "1";
      public static final String AUDIO_SPEED_MODE_ATEMPO = "2";
      public static final String AUDIO_SPEED_MODE_SONIC = "3";
 +    public static final String KEY_SEEK_STEP = "seek_step";
 +    public static final String DEFAULT_SEEK_STEP = "10";
++    public static final String KEY_SEEK_DELAY = "seek_delay";
++    public static final String DEFAULT_SEEK_DELAY = "300";
 +    public static final String KEY_NEXT_PREVIOUS_KEYS_ACTION = "next_previous_keys_action";
 +    public static final String NEXT_PREVIOUS_KEYS_SWITCH_VIDEO = "switch_video";
 +    public static final String NEXT_PREVIOUS_KEYS_AUDIO_SPEED = "audio_speed";
      public static final String KEY_ENABLE_DYNAMIC_AUDIO_DELAY = "enable_dynamic_audio_delay";
      public static final String KEY_ACTIVATE_REFRESHRATE_SWITCH = "enable_tv_refreshrate_switch_mode";
      public static final String KEY_ACTIVATE_3D_SWITCH = "activate_tv_switch";
-@@ -576,6 +581,25 @@ public class VideoPreferencesCommon implements OnSharedPreferenceChangeListener
+@@ -576,6 +583,41 @@ public class VideoPreferencesCommon implements OnSharedPreferenceChangeListener
          return isAudioSpeedEnabled(PreferenceManager.getDefaultSharedPreferences(context));
      }
  
@@ -3014,6 +3120,22 @@ index 7c62421f..f485c9dd 100644
 +            return step > 0 ? step : defaultStep;
 +        } catch (NumberFormatException e) {
 +            return defaultStep;
++        }
++    }
++
++    /**
++     * Delay in ms after the last seek step press before the accumulated seek is sent,
++     * 0 seeks on every press.
++     */
++    public static int getSeekDelay(Context context) {
++        int defaultDelay = Integer.parseInt(DEFAULT_SEEK_DELAY);
++        if (context == null) return defaultDelay;
++        try {
++            int delay = Integer.parseInt(PreferenceManager.getDefaultSharedPreferences(context)
++                    .getString(KEY_SEEK_DELAY, DEFAULT_SEEK_DELAY));
++            return Math.max(delay, 0);
++        } catch (NumberFormatException e) {
++            return defaultDelay;
 +        }
 +    }
 +
